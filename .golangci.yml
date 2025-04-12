@@ -28,6 +28,10 @@ linters:
       - linters:
           - funlen
           - gosec
+          - varnamelen
+          - prealloc
+          - err113
+          - wrapcheck
         path: (.+)_test.go
     paths:
       - ^(.*/)?third_party(/.*)?$

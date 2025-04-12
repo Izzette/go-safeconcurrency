@@ -175,7 +175,7 @@ func TestHandleErrorSendsError(t *testing.T) {
 	select {
 	case result := <-resultsChan:
 		_, actualErr := result.Get()
-		if actualErr != expectedErr {
+		if !errors.Is(actualErr, expectedErr) {
 			t.Errorf("expected error %v, got %v", expectedErr, actualErr)
 		}
 	default:

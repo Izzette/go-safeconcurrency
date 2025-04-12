@@ -79,11 +79,11 @@ See [examples](examples) for more detailed examples.
 
 ### Key Components
 
-1. **Runner Interface**  
+1. **Runner Interface**
    Implement your concurrent logic by creating a type that satisfies `types.Runner`:
    ```go
    type MyRunner struct{}
-   
+
    func (r *MyRunner) Run(ctx context.Context, h types.Handle[Output]) error {
        // Your concurrent logic here
        h.Publish(ctx, value)
@@ -92,14 +92,14 @@ See [examples](examples) for more detailed examples.
    }
    ```
 
-2. **Generator**  
+2. **Generator**
    Create and manage concurrent execution:
    ```go
    gen := generator.NewGenerator[Output](&MyRunner{})
    gen.Start(ctx)
    ```
 
-3. **Result Handling**  
+3. **Result Handling**
    Consume results safely from the channel:
    ```go
    for result := range gen.Results() {

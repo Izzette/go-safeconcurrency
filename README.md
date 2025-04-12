@@ -9,7 +9,7 @@ It enforces best practices for context propagation, error handling, and resource
 This project is still in early development, and the API may change as we refine the design and functionality.
 Expect new features and improvements in future releases, generators are just the beginning.
 
-![Go Version](https://img.shields.io/badge/go-1.18-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Go Version](https://img.shields.io/badge/go-1.19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Features
 

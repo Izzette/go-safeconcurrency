@@ -1,0 +1,38 @@
+---
+name: pre-commit
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          check-latest: true
+
+      - name: Install golangci-lint
+        run: |
+          curl --silent --show-error --fail --location https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh |
+            sh -s -- -b "$(go env GOPATH)/bin" v2.0.2
+
+      - uses: pre-commit/action@v3.0.1
+        env:
+          # The official golangci-lint action runs config verification and linter, but does not run the formatter.
+          SKIP: golangci-lint-config-verify,golangci-lint-full
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

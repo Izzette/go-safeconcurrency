@@ -1,6 +1,6 @@
 # SafeConcurrency for Go
 
-![SafeConcurrency Logo](doc/assets/images/logo-500x500.png)
+<img align="left" width="250" height="250" alt="SafeConcurrency Logo" src="doc/assets/images/logo-500x500.png">
 
 SafeConcurrency is a Go library designed to simplify the management of concurrent tasks, providing a safe and structured way to produce and consume results.
 It enforces best practices for context propagation, error handling, and resource cleanup.

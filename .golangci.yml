@@ -1,0 +1,45 @@
+version: "2"
+linters:
+  default: all
+  disable:
+    - depguard
+    - exhaustruct
+    - godox
+    - ireturn
+    - inamedparam
+    - nolintlint
+    - paralleltest
+    - testpackage
+    - copyloopvar # requires 1.22
+    - intrange # requires 1.22
+    - wsl
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: false
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - funlen
+          - gosec
+        path: (.+)_test.go
+    paths:
+      - ^(.*/)?third_party(/.*)?$
+      - ^(.*/)?builtin(/.*)?$
+      - ^(.*/)?examples(/.*)?$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - ^(.*/)?third_party(/.*)?$
+      - ^(.*/)?builtin(/.*)?$

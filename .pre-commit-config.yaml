@@ -1,0 +1,50 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+default_install_hook_types:
+- pre-commit
+- pre-push
+default_stages:
+- pre-commit
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.4.0
+  hooks:
+  - id: trailing-whitespace
+  - id: end-of-file-fixer
+  - id: check-yaml
+  - id: check-added-large-files
+- repo: local
+  hooks:
+  - id: go-mod-tidy
+    name: go mod tidy
+    entry: go mod tidy
+    language: golang
+    types:
+    - go
+    pass_filenames: false
+- repo: https://github.com/golangci/golangci-lint
+  rev: 8c929e0
+  hooks:
+  - id: golangci-lint-config-verify
+  - id: golangci-lint-full
+    args:
+    - --timeout
+    - 10m
+  - id: golangci-lint-fmt
+- repo: local
+  hooks:
+  - id: trufflehog
+    name: TruffleHog
+    description: Detect secrets in your data.
+    entry: sh -c 'docker run --rm --volume "$PWD:/src" ghcr.io/trufflesecurity/trufflehog:latest git --branch=HEAD file:///src --fail --only-verified'
+    language: system
+    stages:
+    - pre-push
+- repo: local
+  hooks:
+  - id: semgrep
+    name: semgrep
+    entry: sh -c 'docker run --rm --volume "$PWD:/src" docker.io/library/returntocorp/semgrep semgrep --config p/ci --error --skip-unknown-extensions'
+    language: system
+    stages:
+    - pre-push

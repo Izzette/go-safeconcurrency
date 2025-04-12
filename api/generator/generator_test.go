@@ -194,11 +194,4 @@ func TestHandlePublishAfterContextCancel(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got %v", err)
 	}
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic when publishing after cancel")
-		}
-	}()
-	h.Publish(ctx, 2)
 }

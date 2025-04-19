@@ -15,4 +15,7 @@ type Handle[T any] interface {
 	// If an error is returned, it represents context cancelation.
 	// In these cases, the Runner should immediately cleanup, and return ASAP.
 	Error(context.Context, error) error
+
+	// Close closes the handle and releases any resources.
+	Close()
 }

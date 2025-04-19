@@ -14,10 +14,12 @@ Expect new features and improvements in future releases, generators are just the
 ## Features
 
 - **Generator Pattern**: Safely produce values from concurrent operations via channel-based results
+  - Adheres to Go best-practice: ["Do not communicate by sharing memory; instead, share memory by communicating"](https://go.dev/blog/codelab-share)
 - **Context Integration**: Built-in support for context cancellation and deadlines
-- **Error Handling**: Clear separation between recoverable errors (sent via results) and fatal errors (halting execution)
-- **Thread-Safe**: Panic guards prevent accidental misuse of APIs
+- **Error Handling**: Gracefully handle errors with recoverable and fatal error reporting
+- **Thread-Safe**: All APIs are designed for concurrent use with goroutines
 - **Flexible Buffering**: Configurable result channel buffering for different throughput needs
+- **Worker Pools**: Manage concurrent task execution with configurable concurrency and buffering
 
 ### Planned Features
 
@@ -106,6 +108,17 @@ See [examples](examples) for more detailed examples.
        val, err := result.Get()
        // Handle value/error
    }
+   ```
+
+4. **Worker Pools**
+   Create and manage worker pools:
+   ```go
+   pool := pool.NewPool[ResourceType](resource, concurrency)
+   pool.Start()
+   defer pool.Close()
+
+   // Submit tasks
+   pool.Submit(ctx, task)
    ```
 
 ## Documentation

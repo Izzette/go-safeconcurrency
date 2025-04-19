@@ -7,7 +7,7 @@ import (
 
 func TestNewSimpleResult(t *testing.T) {
 	expected := 42
-	result := NewSimpleResult(expected)
+	result := &simpleResult[int]{expected}
 	val, err := result.Get()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -19,7 +19,7 @@ func TestNewSimpleResult(t *testing.T) {
 
 func TestNewSimpleError(t *testing.T) {
 	expectedErr := errors.New("test error")
-	result := NewSimpleError[int](expectedErr)
+	result := &simpleError[int]{expectedErr}
 	val, err := result.Get()
 	if val != 0 {
 		t.Errorf("expected zero value, got %d", val)

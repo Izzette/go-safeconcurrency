@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 
+	"github.com/Izzette/go-safeconcurrency/api/results"
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
@@ -14,7 +15,7 @@ type Generator[T any] struct {
 	results chan types.Result[T]
 	done    chan struct{}
 	err     error
-	started atomic.Bool
+	started *atomic.Bool
 }
 
 // NewGenerator creates (but does not start) a types.Generator, with no results buffering.
@@ -29,6 +30,7 @@ func NewGeneratorBuffered[T any](runner types.Runner[T], buffer uint) *Generator
 		runner:  runner,
 		results: make(chan types.Result[T], buffer),
 		done:    make(chan struct{}),
+		started: &atomic.Bool{},
 	}
 }
 
@@ -38,7 +40,7 @@ func (gen *Generator[T]) Start(ctx context.Context) {
 		panic("attempt to start previously started generator.Generator")
 	}
 
-	h := &handle[T]{results: gen.results}
+	h := results.NewHandle(gen.results)
 	go gen.startInner(ctx, h)
 }
 
@@ -63,7 +65,7 @@ func (gen *Generator[T]) Results() <-chan types.Result[T] {
 }
 
 func (gen *Generator[T]) startInner(ctx context.Context, h types.Handle[T]) {
-	defer close(gen.results)
+	defer h.Close()
 	defer close(gen.done)
 
 	gen.err = gen.runner.Run(ctx, h)

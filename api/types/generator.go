@@ -2,11 +2,12 @@ package types
 
 import "context"
 
-// Generator objects produce one or more results asynchronously via a results channel, obtained from .Results().
-// Prudence around calls to .Run() or .Wait() should be observed, as if your results channel does not have enough buffer
-// to capture ALL results.
-// This can lead to a deadlock if all results are not completely consumed before calling .Wait(), or results are
-// consumed in another goroutine.
+// Generator objects produce one or more results asynchronously via a results channel.
+// Prudence around calls to [types.Generator.Run] or [types.Generator.Wait] should be observed, as if your results
+// channel does not have enough buffer to capture ALL results produced by the generator, the generator will block until
+// the results channel is drained.
+// This can lead to a deadlock if all results are not completely consumed before calling [types.Generator.Wait], and no
+// mechanism to drain the results channel from another goroutine is in place.
 type Generator[T any] interface {
 	// Start launches a goroutine to produce the results.
 	Start(context.Context)
@@ -20,5 +21,14 @@ type Generator[T any] interface {
 
 	// Results returns a channel which can be used to consume the results of the producer.
 	// It will block indefinitely if .Start() is not called.
-	Results() <-chan Result[T]
+	Results() <-chan T
+}
+
+// Runner represents a piece of runnable code.
+// It is used by [Generator] to produce results.
+type Runner[T any] interface {
+	// Run should start the Runner and block until all work is completed, optionally returning a error.
+	// The same context passed to Run() should be passed to Handle.Publish().
+	// Run MUST cleanup and return as soon as possible after a call to Handle.Publish() returns a cancellation error.
+	Run(context.Context, Handle[T]) error
 }

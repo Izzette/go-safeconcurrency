@@ -8,34 +8,26 @@ import (
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
-type contextualTask[PoolResourceT any] struct {
-	types.BareTask[PoolResourceT]
-	getContext func() context.Context
-}
-
-// Pool represents a worker pool that can execute tasks concurrently.
-type Pool[PoolResourceT any] struct {
-	resource    PoolResourceT
-	requests    chan contextualTask[PoolResourceT]
-	concurrency uint
-	wg          *sync.WaitGroup
-	started     *atomic.Bool
-}
-
-// NewPool creates a new worker pool with the specified pool resource (passed to each task) and concurrency workers.
-// It is equivalent to NewPoolBuffered with a buffer size of 0.
-func NewPool[PoolResourceT any](resource PoolResourceT, concurrency int) *Pool[PoolResourceT] {
+// NewPool creates (but does not start) a basic implementation of [types.Pool] with no requests buffering.
+// If you would like requests buffering, use [NewPoolBuffered] instead.
+// It is equivalent to calling [NewPoolBuffered] with a buffer size of 0.
+func NewPool[PoolResourceT any](resource PoolResourceT, concurrency int) types.Pool[PoolResourceT] {
 	return NewPoolBuffered(resource, concurrency, 0)
 }
 
-// NewPoolBuffered creates a new worker pool with the specified pool resource (passed to each task), concurrency
-// workers, and the specified buffer size for the requests channel.
-func NewPoolBuffered[PoolResourceT any](resource PoolResourceT, concurrency int, buffer uint) *Pool[PoolResourceT] {
+// NewPoolBuffered creates (but does not start) a basic implementation of [types.Pool].
+// It uses the specified pool resource (passed to each task), concurrency workers, and the specified buffer size for the
+// requests channel (used by [types.Pool.Submit] to queue tasks).
+//
+// The resource argument may be set to nil and PoolResourceT set to type any if a shared pool resource is not required.
+func NewPoolBuffered[PoolResourceT any](
+	resource PoolResourceT, concurrency int, buffer uint,
+) types.Pool[PoolResourceT] {
 	if concurrency <= 0 {
 		panic("Worker pool must have at least one worker!")
 	}
 
-	pool := &Pool[PoolResourceT]{
+	pool := &pool[PoolResourceT]{
 		resource:    resource,
 		requests:    make(chan contextualTask[PoolResourceT], buffer),
 		concurrency: uint(concurrency),
@@ -49,9 +41,24 @@ func NewPoolBuffered[PoolResourceT any](resource PoolResourceT, concurrency int,
 	return pool
 }
 
-// Start implements github.com/Izzette/go-safeconcurrency/api/types/Pool.Start.
-// Start the worker pool with the configured concurrency.
-func (p *Pool[PoolResourceT]) Start() {
+// contextualTask is a wrapper for [types.ValuelessTask] that adds a [context.Context] to the task.
+type contextualTask[PoolResourceT any] struct {
+	types.ValuelessTask[PoolResourceT]
+	getContext func() context.Context
+}
+
+// pool implements [types.Pool].
+type pool[PoolResourceT any] struct {
+	resource    PoolResourceT
+	requests    chan contextualTask[PoolResourceT]
+	concurrency uint
+	wg          *sync.WaitGroup
+	started     *atomic.Bool
+}
+
+// Start implements [types.Pool.Start].
+// Starts the worker pool with the configured concurrency.
+func (p *pool[PoolResourceT]) Start() {
 	// Check if the pool has already been started.
 	if p.started.Swap(true) {
 		panic("attempt to start previously started pool.Pool")
@@ -63,10 +70,8 @@ func (p *Pool[PoolResourceT]) Start() {
 	}
 }
 
-// Close implements github.com/Izzette/go-safeconcurrency/api/types/Pool.Close.
-// Close stops the pool, and waits for all tasks to complete.
-// It is safe to call Close() multiple times.
-func (p *Pool[PoolResourceT]) Close() {
+// Close implements [types.Pool.Close].
+func (p *pool[PoolResourceT]) Close() {
 	close(p.requests)
 	if !p.started.Load() {
 		return
@@ -74,10 +79,8 @@ func (p *Pool[PoolResourceT]) Close() {
 	p.wg.Wait()
 }
 
-// Submit implements github.com/Izzette/go-safeconcurrency/api/types/Pool.Submit.
-// The provided context is used passed to of the task when it is executed in the pool.
-// ⚠️You must never attempt to submit tasks to a pool which has been closed, this will result in a panic!
-func (p *Pool[PoolResourceT]) Submit(ctx context.Context, task types.BareTask[PoolResourceT]) error {
+// Submit implements [types.Pool.Submit].
+func (p *pool[PoolResourceT]) Submit(ctx context.Context, task types.ValuelessTask[PoolResourceT]) error {
 	// select is not deterministic, and may still send tasks even if the context has been canceled.
 	if ctx.Err() != nil {
 		//nolint:wrapcheck
@@ -85,8 +88,8 @@ func (p *Pool[PoolResourceT]) Submit(ctx context.Context, task types.BareTask[Po
 	}
 
 	ctxTask := contextualTask[PoolResourceT]{
-		BareTask:   task,
-		getContext: func() context.Context { return ctx },
+		ValuelessTask: task,
+		getContext:    func() context.Context { return ctx },
 	}
 
 	// Submit the task to the requests channel.
@@ -100,7 +103,7 @@ func (p *Pool[PoolResourceT]) Submit(ctx context.Context, task types.BareTask[Po
 }
 
 // worker is a goroutine that executes tasks from the requests channel.
-func (p *Pool[PoolResourceT]) worker() {
+func (p *pool[PoolResourceT]) worker() {
 	defer p.wg.Done()
 
 	for task := range p.requests {

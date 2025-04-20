@@ -11,20 +11,13 @@ import (
 )
 
 type testRunner struct {
-	values    []int
-	err       error
-	sendError error
+	values []int
+	err    error
 }
 
 func (r *testRunner) Run(ctx context.Context, h types.Handle[int]) error {
 	for _, v := range r.values {
 		if err := h.Publish(ctx, v); err != nil {
-			return err
-		}
-	}
-
-	if r.sendError != nil {
-		if err := h.Error(ctx, r.sendError); err != nil {
 			return err
 		}
 	}
@@ -41,11 +34,7 @@ func TestGeneratorSendsAllValues(t *testing.T) {
 	go gen.Start(ctx)
 
 	var received []int
-	for result := range gen.Results() {
-		val, err := result.Get()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+	for val := range gen.Results() {
 		received = append(received, val)
 	}
 
@@ -123,15 +112,14 @@ func TestBufferedGenerator(t *testing.T) {
 	}
 
 	var received []int
-	for result := range gen.Results() {
-		val, err := result.Get()
-		if err != nil {
-			t.Fatal(err)
-		}
+	for val := range gen.Results() {
 		received = append(received, val)
 	}
 
 	if !reflect.DeepEqual(received, values) {
 		t.Errorf("expected %v, got %v", values, received)
+	}
+	if err := gen.Wait(); err != nil {
+		t.Errorf("unexpected error from generator: %v", err)
 	}
 }

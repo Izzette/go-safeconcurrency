@@ -4,46 +4,55 @@ import (
 	"context"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
-type mockTask struct{ t *testing.T }
+type mockMultiResultTask struct{ t *testing.T }
 
-func (t *mockTask) Execute(ctx context.Context, res interface{}, h types.Handle[string]) {
+func (t *mockMultiResultTask) Execute(ctx context.Context, res interface{}, h types.Handle[string]) error {
 	if err := h.Publish(ctx, "test"); err != nil {
 		t.t.Errorf("Failed to publish result: %v", err)
 	}
+
+	return nil
 }
 
-func TestTaskWithHandle(t *testing.T) {
-	bareTask, ch := TaskWithHandleBuffered[interface{}, string](&mockTask{t}, 1)
-	ctx := context.Background()
+func TestWrapMultiResultTask(t *testing.T) {
+	bareTask, taskResult := WrapMultiResultTaskBuffered[interface{}, string](&mockMultiResultTask{t}, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Execute task synchronously
 	bareTask.Execute(ctx, nil)
 
-	select {
-	case res := <-ch:
-		val, err := res.Get()
-		if err != nil || val != "test" {
-			t.Errorf("Unexpected result: %v, %v", val, err)
-		}
-	default:
-		t.Error("No result received")
+	results := make([]string, 0, 1)
+	for val := range taskResult.Results() {
+		results = append(results, val)
+	}
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result, got %d", len(results))
+	} else if results[0] != "test" {
+		t.Errorf("Expected 'test', got '%s'", results[0])
+	}
+	if err := taskResult.Err(); err != nil {
+		t.Errorf("Unexpected error from taskResult: %v", err)
 	}
 }
 
-type mockSingleTask struct{}
-
-func (t *mockSingleTask) Execute(ctx context.Context, res interface{}) (int, error) {
-	return 42, nil
+type mockTask struct {
+	val int
+	err error
 }
 
-func TestTaskWithReturn(t *testing.T) {
-	bareTask, ch := TaskWithReturn[interface{}, int](&mockSingleTask{})
-	ctx := context.Background()
+func (t *mockTask) Execute(ctx context.Context, res interface{}) (int, error) {
+	return t.val, t.err
+}
+
+func TestTaskWrapper(t *testing.T) {
+	bareTask, taskResult := TaskWrapper[interface{}, int](&mockTask{val: 42})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -52,16 +61,14 @@ func TestTaskWithReturn(t *testing.T) {
 		bareTask.Execute(ctx, nil)
 	}()
 
-	timer := time.NewTimer(1 * time.Second)
-	defer timer.Stop()
-	select {
-	case res := <-ch:
-		val, err := res.Get()
-		if err != nil || val != 42 {
-			t.Errorf("Unexpected result: %v, %v", val, err)
-		}
-	case <-timer.C:
-		t.Error("No result received")
+	val, ok := <-taskResult.Results()
+	if !ok {
+		t.Error("Results channel closed unexpectedly")
+	} else if val != 42 {
+		t.Errorf("Unexpected result: %v", val)
+	}
+	if err := taskResult.Err(); err != nil {
+		t.Errorf("Unexpected error from taskResult: %v", err)
 	}
 
 	wg.Wait()

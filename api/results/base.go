@@ -23,7 +23,7 @@ type handle[T any] struct {
 func (h *handle[T]) Publish(ctx context.Context, value T) error {
 	// The `select` statement is non-deterministic, and may still publish a result even if the context has been canceled
 	// before Publish is called.
-	if err := ctx.Err(); err != nil {
+	if err := context.Cause(ctx); err != nil {
 		//nolint:wrapcheck
 		return err
 	}
@@ -31,7 +31,7 @@ func (h *handle[T]) Publish(ctx context.Context, value T) error {
 	select {
 	case <-ctx.Done():
 		//nolint:wrapcheck
-		return ctx.Err()
+		return context.Cause(ctx)
 	case h.results <- value:
 		return nil
 	}

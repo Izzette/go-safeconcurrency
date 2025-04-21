@@ -82,9 +82,9 @@ func (p *pool[PoolResourceT]) Close() {
 // Submit implements [types.Pool.Submit].
 func (p *pool[PoolResourceT]) Submit(ctx context.Context, task types.ValuelessTask[PoolResourceT]) error {
 	// select is not deterministic, and may still send tasks even if the context has been canceled.
-	if ctx.Err() != nil {
+	if err := context.Cause(ctx); err != nil {
 		//nolint:wrapcheck
-		return ctx.Err()
+		return err
 	}
 
 	ctxTask := contextualTask[PoolResourceT]{
@@ -96,7 +96,7 @@ func (p *pool[PoolResourceT]) Submit(ctx context.Context, task types.ValuelessTa
 	select {
 	case <-ctx.Done():
 		//nolint:wrapcheck
-		return ctx.Err()
+		return context.Cause(ctx)
 	case p.requests <- ctxTask:
 		return nil
 	}

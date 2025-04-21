@@ -185,7 +185,7 @@ func (t *mockMultiResultTaskBlocksOnContext) Execute(ctx context.Context, _ inte
 	t.broadcastPublish()
 	<-ctx.Done()
 
-	return ctx.Err()
+	return context.Cause(ctx)
 }
 
 func (t *mockMultiResultTaskBlocksOnContext) broadcastPublish() {

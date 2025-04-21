@@ -31,7 +31,7 @@ func Submit[PoolResourceT any, ValueT any](
 	select {
 	case <-ctx.Done():
 		//nolint:wrapcheck
-		return zero, ctx.Err()
+		return zero, context.Cause(ctx)
 	case result := <-taskResults.Results():
 		// Before using the (possibly nil) result, check if the task produced an error.
 		// We must drain the results channel to ensure that the err is set correctly.
@@ -99,16 +99,19 @@ func SubmitMultiResultBuffered[PoolResourceT any, ValueT any](
 	callbackErr := callbackTaskResults(ctx, taskResults.Results(), callback)
 	if callbackErr != nil {
 		// The callback an error, which means we should cancel the task and stop processing results.
-		cancel(fmt.Errorf("callback error %w caused %w", callbackErr, context.Canceled))
+		cancel(fmt.Errorf("callback error %w", callbackErr))
 	}
 	taskErr := taskResults.Drain()
 
-	// The special error results.Stop ought not to be returned.
-	if err := errors.Join(callbackErr, taskErr); !errors.Is(err, results.Stop) {
-		return err
+	// The special error(s) results.Stop ought not to be returned.
+	if errors.Is(callbackErr, results.Stop) {
+		callbackErr = nil
+	}
+	if errors.Is(taskErr, results.Stop) {
+		taskErr = nil
 	}
 
-	return nil
+	return errors.Join(callbackErr, taskErr)
 }
 
 // SubmitMultiResult is a helper function to submit a [types.MultiResultTask] to a [types.Pool] and runs the
@@ -159,7 +162,7 @@ func callbackTaskResults[ValueT any](
 		select {
 		case <-ctx.Done():
 			//nolint:wrapcheck
-			return ctx.Err()
+			return context.Cause(ctx)
 		case result, ok := <-resultsChan:
 			if !ok {
 				// The results channel is closed, we are done.

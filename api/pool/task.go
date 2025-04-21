@@ -7,7 +7,7 @@ import (
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
-// TaskWrapper wraps a [types.Task] so that it can be executed in a [types.Pool] and returns a channel for
+// WrapTask wraps a [types.Task] so that it can be executed in a [types.Pool] and returns a channel for
 // results.
 // This channel has a buffer size of 1 and will not block the worker when publishing the result.
 // The results channel is always written to, even if the task returns an error.
@@ -18,7 +18,7 @@ import (
 // The [Submit] helper will wrap the [types.Task], submit it to the pool, and wait for the result.
 // The [Submit] helper implements error handling correctly and is less error prone than using this wrapper and calling
 // [types.Pool.Submit] directly.
-func TaskWrapper[PoolResourceT any, ValueT any](
+func WrapTask[PoolResourceT any, ValueT any](
 	task types.Task[PoolResourceT, ValueT],
 ) (types.ValuelessTask[PoolResourceT], types.TaskResult[ValueT]) {
 	res := make(chan ValueT, 1)
@@ -69,6 +69,15 @@ func WrapMultiResultTask[PoolResourceT any, ValueT any](
 	task types.MultiResultTask[PoolResourceT, ValueT],
 ) (types.ValuelessTask[PoolResourceT], types.TaskResult[ValueT]) {
 	return WrapMultiResultTaskBuffered(task, 1)
+}
+
+// WrapTaskFunc wraps a [types.TaskFunc] so that it can be executed in a [types.Pool] and returns a [types.TaskResult]
+// for execution monitoring and error propagation.
+// It is not recommended to use this wrapper directly, but rather use the [SubmitFunc] helper function.
+func WrapTaskFunc[PoolResourceT any](f types.TaskFunc[PoolResourceT]) (
+	types.ValuelessTask[PoolResourceT], types.TaskResult[struct{}],
+) {
+	return WrapTask[PoolResourceT, struct{}](taskFuncWrapper[PoolResourceT]{f})
 }
 
 // taskResult implements [types.TaskResult].
@@ -127,4 +136,17 @@ func (t taskWrapper[PoolResourceT, ValueT]) Execute(
 
 	// As the results channel is always buffered, we can publish the result without blocking the worker.
 	t.r <- value
+}
+
+// taskFunc is a function that implements [types.Task].
+type taskFuncWrapper[PoolResourceT any] struct {
+	f types.TaskFunc[PoolResourceT]
+}
+
+// Execute implements [types.Task.Execute].
+func (t taskFuncWrapper[PoolResourceT]) Execute(
+	ctx context.Context,
+	resource PoolResourceT,
+) (struct{}, error) {
+	return struct{}{}, t.f(ctx, resource)
 }

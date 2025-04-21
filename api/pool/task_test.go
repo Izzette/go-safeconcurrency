@@ -49,8 +49,8 @@ func (t *mockTask) Execute(ctx context.Context, res interface{}) (int, error) {
 	return t.val, t.err
 }
 
-func TestTaskWrapper(t *testing.T) {
-	bareTask, taskResult := TaskWrapper[interface{}, int](&mockTask{val: 42})
+func TestWrapTask(t *testing.T) {
+	bareTask, taskResult := WrapTask[interface{}, int](&mockTask{val: 42})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -65,6 +65,33 @@ func TestTaskWrapper(t *testing.T) {
 	if !ok {
 		t.Error("Results channel closed unexpectedly")
 	} else if val != 42 {
+		t.Errorf("Unexpected result: %v", val)
+	}
+	if err := taskResult.Drain(); err != nil {
+		t.Errorf("Unexpected error from taskResult: %v", err)
+	}
+
+	wg.Wait()
+}
+
+func TestWrapTaskFunc(t *testing.T) {
+	bareTask, taskResult := WrapTaskFunc[interface{}](func(ctx context.Context, res interface{}) error {
+		return nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		bareTask.Execute(ctx, nil)
+	}()
+
+	val, ok := <-taskResult.Results()
+	if !ok {
+		t.Error("Results channel closed unexpectedly")
+	} else if val != struct{}{} {
 		t.Errorf("Unexpected result: %v", val)
 	}
 	if err := taskResult.Drain(); err != nil {

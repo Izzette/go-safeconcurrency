@@ -313,3 +313,24 @@ func TestSubmitMultiResultContextCancel(t *testing.T) {
 		t.Errorf("Expected %v, got %v", expected, values)
 	}
 }
+
+func TestSubmitFunc(t *testing.T) {
+	ctx := context.Background()
+	p := NewPool[any](nil, 1)
+	p.Start()
+	defer p.Close()
+
+	ran := false
+	anError := errors.New("an error")
+	err := SubmitFunc[any](ctx, p, func(ctx context.Context, res interface{}) error {
+		ran = true
+
+		return anError
+	})
+	if !ran {
+		t.Errorf("Expected task to be run, but it was not")
+	}
+	if !errors.Is(err, anError) {
+		t.Errorf("Expected error %v, got %v", anError, err)
+	}
+}

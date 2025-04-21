@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/Izzette/go-safeconcurrency/api/results"
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
@@ -124,7 +125,7 @@ func TestSubmitMultiResultSuccess(t *testing.T) {
 
 	expected := []string{"a", "b", "c"}
 	task := &mockMultiResultTask2{values: expected}
-	results, err := SubmitMultiResult[any, string](ctx, p, task)
+	results, err := SubmitMultiResultCollectAll[any, string](ctx, p, task)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -141,9 +142,28 @@ func TestSubmitMultiResultTaskError(t *testing.T) {
 
 	expectedErr := errors.New("task error")
 	task := &mockMultiResultTask2{err: expectedErr}
-	_, err := SubmitMultiResult[any, string](ctx, p, task)
+	_, err := SubmitMultiResultCollectAll[any, string](ctx, p, task)
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("Expected error %v, got %v", expectedErr, err)
+	}
+}
+
+func TestSubmitMultiResultEarlyContextCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel immediately to simulate early cancellation.
+	cancel()
+
+	p := NewPool[any](nil, 1)
+	p.Start()
+	defer p.Close()
+
+	task := &mockMultiResultTask{t}
+	results, err := SubmitMultiResultCollectAll[any, string](ctx, p, task)
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("Expected context.Canceled, got %v", err)
+	}
+	if results != nil {
+		t.Errorf("Expected nil results, got %v", results)
 	}
 }
 
@@ -165,7 +185,7 @@ func (t *mockMultiResultTaskBlocksOnContext) Execute(ctx context.Context, _ inte
 	t.broadcastPublish()
 	<-ctx.Done()
 
-	return ctx.Err()
+	return context.Cause(ctx)
 }
 
 func (t *mockMultiResultTaskBlocksOnContext) broadcastPublish() {
@@ -195,11 +215,101 @@ func TestSubmitMultiResultContextCancelled(t *testing.T) {
 		cancel()
 	}()
 
-	_, err := SubmitMultiResult[any, string](ctx, p, task)
+	_, err := SubmitMultiResultCollectAll[any, string](ctx, p, task)
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected context.Canceled, got %v", err)
 	}
 	if v := task.publishedCount.Load(); v != 1 {
 		t.Errorf("Expected %d values to be published, got %d", len(task.values), v)
+	}
+}
+
+func TestSubmitMultiResultStop(t *testing.T) {
+	ctx := context.Background()
+	p := NewPool[any](nil, 1)
+	p.Start()
+	defer p.Close()
+
+	task := &mockMultiResultTask2{values: []string{"a", "b", "c"}}
+	values := make([]string, 0)
+	err := SubmitMultiResultBuffered[any, string](ctx, p, task, 0, func(ctx context.Context, value string) error {
+		values = append(values, value)
+		if value == "b" {
+			return results.Stop
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	expected := []string{"a", "b"}
+	if !reflect.DeepEqual(values, expected) {
+		t.Errorf("Expected %v, got %v", expected, values)
+	}
+}
+
+func TestSubmitMultiResultBothErrors(t *testing.T) {
+	ctx := context.Background()
+	p := NewPool[any](nil, 1)
+	p.Start()
+	defer p.Close()
+
+	taskErr := errors.New("task error")
+	callbackErr := errors.New("callback error")
+	task := &mockMultiResultTask2{values: []string{"a", "b", "c"}, err: taskErr}
+	values := make([]string, 0)
+	err := SubmitMultiResult[any, string](ctx, p, task, func(ctx context.Context, value string) error {
+		values = append(values, value)
+		// Ensure the callback error is only after all the values are processed.
+		if value == "c" {
+			return callbackErr
+		}
+
+		return nil
+	})
+	if err == nil {
+		t.Fatal("Expected non-nil error")
+	}
+	// Check if the error is a join error and contains both task and callback errors.
+	if !errors.Is(err, taskErr) || !errors.Is(err, callbackErr) {
+		t.Errorf("Expected task error %v and callback error %v, got %v", taskErr, callbackErr, err)
+	}
+
+	// Make sure that returning any error will not continue to process results.
+	expected := []string{"a", "b", "c"}
+	if !reflect.DeepEqual(values, expected) {
+		t.Errorf("Expected %v, got %v", expected, values)
+	}
+}
+
+func TestSubmitMultiResultContextCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	p := NewPool[any](nil, 1)
+	p.Start()
+	defer p.Close()
+
+	task := &mockMultiResultTask2{values: []string{"a", "b", "c"}}
+	values := make([]string, 0)
+	err := SubmitMultiResultBuffered[any, string](ctx, p, task, 0, func(ctx context.Context, value string) error {
+		values = append(values, value)
+		if value == "b" {
+			// Cancel the context to simulate a cancelation in-flight.
+			cancel()
+			// Do not return an error here, as we want to test the behavior of the context cancelation.
+			return nil
+		}
+
+		return nil
+	})
+	if err == nil {
+		t.Fatal("Expected non-nil error")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("Expected context.Canceled, got %v", err)
+	}
+	expected := []string{"a", "b"}
+	if !reflect.DeepEqual(values, expected) {
+		t.Errorf("Expected %v, got %v", expected, values)
 	}
 }

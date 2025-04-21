@@ -23,7 +23,6 @@ func NewGeneratorBuffered[T any](runner types.Runner[T], buffer uint) types.Gene
 		runner:  runner,
 		results: make(chan T, buffer),
 		done:    make(chan struct{}),
-		err:     &atomic.Pointer[error]{},
 		started: &atomic.Bool{},
 	}
 }
@@ -33,7 +32,7 @@ type generator[T any] struct {
 	runner  types.Runner[T]
 	results chan T
 	done    chan struct{}
-	err     *atomic.Pointer[error]
+	err     error
 	started *atomic.Bool
 }
 
@@ -59,11 +58,7 @@ func (gen *generator[T]) Wait() error {
 	// The done channel is always closed when the Runner completes, after setting w.err.
 	<-gen.done
 
-	if errPtr := gen.err.Load(); errPtr != nil {
-		return *errPtr
-	}
-
-	return nil
+	return gen.err
 }
 
 // Results implements [types.Generator.Results].
@@ -76,6 +71,5 @@ func (gen *generator[T]) startInner(ctx context.Context, h types.Handle[T]) {
 	defer h.Close()
 	defer close(gen.done)
 
-	err := gen.runner.Run(ctx, h)
-	gen.err.Store(&err)
+	gen.err = gen.runner.Run(ctx, h)
 }

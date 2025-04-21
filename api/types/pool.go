@@ -66,12 +66,12 @@ type TaskResult[ValueT any] interface {
 	Results() <-chan ValueT
 
 	// Drain waits the task to complete and drains the results channel, the results are not returned.
-	// This is useful if you just want to wait for the task to complete.
-	// It returns TaskResult.Err after draining the results channel.
+	// It returns the error produced by the task, if any.
+	// It is safe to call this method as many times as needed to access the error and will never block after the first call
+	// to Drain returns.
 	Drain() error
-
-	// Err returns the error returned by the task.
-	// If the context is canceled, this will return the context error.
-	// If the task is not finished or was successful, this will return nil.
-	Err() error
 }
+
+// TaskCallback is a callback used by [github.com/Izzette/go-safeconcurrency/api/pool.SubmitMultiResult] to process the
+// results of a [types.MultiValueTask] as they are produced.
+type TaskCallback[ValueT any] func(context.Context, ValueT) error

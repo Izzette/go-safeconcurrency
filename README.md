@@ -10,7 +10,7 @@ It enforces best practices for context propagation, error handling, and resource
 The API will change frequently as we refine the design and functionality.
 Expect new features and improvements in future releases, generators and work pools are just the beginning.
 
-![Go Version](https://img.shields.io/badge/go-1.19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Go Version](https://img.shields.io/badge/go-1.20-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Features
 

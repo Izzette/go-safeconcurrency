@@ -5,7 +5,6 @@ import (
 	"errors"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
@@ -97,15 +96,33 @@ func TestGeneratorStartPanicsWhenCalledTwice(t *testing.T) {
 	gen.Start(ctx)
 }
 
+type testRunnerDone struct {
+	values []int
+	err    error
+	done   chan struct{}
+}
+
+func (r *testRunnerDone) Run(ctx context.Context, h types.Handle[int]) error {
+	defer close(r.done)
+	for _, v := range r.values {
+		if err := h.Publish(ctx, v); err != nil {
+			return err
+		}
+	}
+
+	return r.err
+}
+
 func TestBufferedGenerator(t *testing.T) {
 	values := []int{1, 2, 3}
-	runner := &testRunner{values: values}
+	runner := &testRunnerDone{values: values, done: make(chan struct{})}
 	gen := NewGeneratorBuffered[int](runner, uint(len(values)))
 	ctx := context.Background()
 
 	go gen.Start(ctx)
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait for the generator to finish sending results
+	<-runner.done
 
 	if len(gen.Results()) != len(values) {
 		t.Errorf("expected %d buffered results, got %d", len(values), len(gen.Results()))

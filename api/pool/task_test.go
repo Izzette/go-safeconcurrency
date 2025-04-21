@@ -35,7 +35,7 @@ func TestWrapMultiResultTask(t *testing.T) {
 	} else if results[0] != "test" {
 		t.Errorf("Expected 'test', got '%s'", results[0])
 	}
-	if err := taskResult.Err(); err != nil {
+	if err := taskResult.Drain(); err != nil {
 		t.Errorf("Unexpected error from taskResult: %v", err)
 	}
 }
@@ -67,7 +67,7 @@ func TestTaskWrapper(t *testing.T) {
 	} else if val != 42 {
 		t.Errorf("Unexpected result: %v", val)
 	}
-	if err := taskResult.Err(); err != nil {
+	if err := taskResult.Drain(); err != nil {
 		t.Errorf("Unexpected error from taskResult: %v", err)
 	}
 

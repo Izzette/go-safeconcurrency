@@ -60,7 +60,7 @@ func TestPoolSubmitAfterClose(t *testing.T) {
 }
 
 func TestPoolContextCancel(t *testing.T) {
-	p := NewPool[any](nil, 1)
+	p := NewPoolBuffered[any](nil, 1, 0)
 	p.Start()
 	defer p.Close()
 

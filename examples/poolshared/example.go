@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/Izzette/go-safeconcurrency/api/pool"
 	"github.com/Izzette/go-safeconcurrency/api/types"
@@ -29,28 +28,18 @@ func main() {
 
 	// Tasks that return multiple results are more complicated, but can provide significant performanc benefits in certain
 	// cases.
-	// In order to use them, make a MultiResultTask like stringTask, wrap the task in a ValuelessTask, than submit it to
-	// the pool.
-	valuelessTask, taskResults := pool.WrapMultiResultTask[any, string](&stringTask{})
-
-	// Submit the task to the pool.
-	// If context is canceled before the task is published it will instead return an error.
-	ctx := context.Background()
-	if err := sharedpool.Submit(ctx, valuelessTask); err != nil {
-		fmt.Printf("Error submitting stringTask: %v\n", err)
-		os.Exit(1)
-	}
-	// Only drain the results channel if the task was submitted successfully.
-	// We should always have already drained the results channel below, but this is a precaution to avoid deadlocks in case
-	// we want to return early due to an error encountered while processing the results.
-	// Canceling the context can also be used to stop the pool from blocking.
-	defer taskResults.Drain()
-
-	// Wait for the result or context cancellation, whichever comes first.
-	for value := range taskResults.Results() {
-		fmt.Printf("Result from stringTask: %s\n", value)
-	}
-	if err := taskResults.Err(); err != nil {
+	// In order to use them, make a MultiResultTask like stringTask, which implements [types.MultiResultTask].
+	// Then, submit it to the pool using [types.Pool.SubmitMultiResult], passing a callback that will be invoked in this
+	// goroutine for each result published by the task.
+	if err := pool.SubmitMultiResult[any, string](
+		context.Background(), sharedpool, &stringTask{},
+		func(_ctx context.Context, value string) error {
+			// This function is called for each result published by the task.
+			// It is _not_ called in the goroutine of the task, pool resources should not be used here.
+			fmt.Printf("Result from stringTask: %s\n", value)
+			return nil
+		},
+	); err != nil {
 		fmt.Printf("Error from stringTask: %v\n", err)
 	}
 
@@ -62,7 +51,7 @@ func main() {
 	// they are produced is not required.
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	cancelFunc()
-	if _, err := pool.SubmitMultiResult[any, string](ctx, sharedpool, &stringTask{}); err != nil {
+	if _, err := pool.SubmitMultiResultCollectAll[any, string](ctx, sharedpool, &stringTask{}); err != nil {
 		fmt.Printf("Error submitting stringTaskWontRun: %v\n", err)
 	}
 }

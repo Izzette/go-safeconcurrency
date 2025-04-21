@@ -110,4 +110,4 @@ go test -v ./examples
 
 On
 [pkg.go.dev/github.com/Izzette/go-safeconcurrency/examples](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/examples#pkg-overview)
-you can play with the examples, change their code, and see the expected output.
+you can find the individual examples, their expected outputs, and more.

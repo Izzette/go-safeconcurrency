@@ -85,11 +85,18 @@ Expect new features and improvements in future releases, generators and work poo
    // Handle result
    ```
 
-See [examples](examples) for more detailed examples.
+See the [examples](examples) directory for more detailed examples, or interact
+with them in the browser on
+[pkg.go.dev](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/examples).
 
 ## Documentation
 
 Full API documentation is available on [GoDoc](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency).
+
+- For types and interfaces, see [api/types](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/api/types).
+- For creating generators, see [api/generator](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/api/generator).
+- For creating worker pools and tasks, see [api/pool](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/api/pool).
+- Examples can be interacted with in the browser at [examples](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/examples).
 
 ## Contributing
 

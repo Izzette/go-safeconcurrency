@@ -18,7 +18,7 @@ func Submit[PoolResourceT any, ValueT any](
 	var zero ValueT
 
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := TaskWrapper[PoolResourceT, ValueT](task)
+	valuelessTask, taskResults := WrapTask[PoolResourceT, ValueT](task)
 
 	// Submit the task to the pool.
 	// If context is canceled before the task is published it will instead return an error.
@@ -152,6 +152,38 @@ func SubmitMultiResultCollectAll[PoolResourceT any, ValueT any](
 	}
 
 	return results, nil
+}
+
+// SubmitFunc is a helper function to submit a [types.TaskFunc] to a [types.Pool].
+func SubmitFunc[PoolResourceT any](
+	ctx context.Context,
+	pool types.Pool[PoolResourceT],
+	taskFunc types.TaskFunc[PoolResourceT],
+) error {
+	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
+	valuelessTask, taskResults := WrapTaskFunc[PoolResourceT](taskFunc)
+
+	// Submit the task to the pool.
+	// If context is canceled before the task is published it will instead return an error.
+	if err := pool.Submit(ctx, valuelessTask); err != nil {
+		//nolint:wrapcheck
+		return err
+	}
+
+	// Wait for the result or context cancellation, whichever comes first.
+	select {
+	case <-ctx.Done():
+		//nolint:wrapcheck
+		return context.Cause(ctx)
+	case <-taskResults.Results():
+		// Check for an error returned by the task.
+		if err := taskResults.Drain(); err != nil {
+			//nolint:wrapcheck
+			return err
+		}
+
+		return nil
+	}
 }
 
 // callbackTaskResults consumes the results channel and calls the callback for each result.

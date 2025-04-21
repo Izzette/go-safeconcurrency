@@ -26,7 +26,7 @@ type Pool[PoolResourceT any] interface {
 
 // Task is a simple task representing a unit of work that can be execution in a [Pool].
 // Task produces a single value result, and an error.
-// Task may be wrapped in a [ValuelessTask] with [github.com/Izzette/go-safeconcurrency/api/pool.TaskWrapper].
+// Task may be wrapped in a [ValuelessTask] with [github.com/Izzette/go-safeconcurrency/api/pool.WrapTask].
 // PoolResourceT is the same type as the resource used by the [Pool].
 // ValueT is the type of value(s) produced by the task.
 // If you do not need to return a value but only an error, you can simply set ValueT to any and return nil from the
@@ -56,6 +56,10 @@ type ValuelessTask[PoolResourceT any] interface {
 	// Execute runs the task with the pool resource.
 	Execute(context.Context, PoolResourceT)
 }
+
+// TaskFunc can be passed to [github.com/Izzette/go-safeconcurrency/api/pool.SubmitFunc] to execute the function as a
+// task.
+type TaskFunc[PoolResourceT any] func(context.Context, PoolResourceT) error
 
 // TaskResult is the result of a task execution.
 // It is used to propagate results and recoverable errors from the task to the caller.

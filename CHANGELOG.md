@@ -3,9 +3,8 @@
 ## [0.3.2](https://github.com/Izzette/go-safeconcurrency/compare/v0.3.1...v0.3.2) (2025-04-22)
 
 
-### Bug Fixes
+### Features
 
-* add package overview go-doc comment ([be2671e](https://github.com/Izzette/go-safeconcurrency/commit/be2671e5d9bbaa17061c3d4b2c97d360128c2e41))
 * add package overview go-doc comment ([691f2ae](https://github.com/Izzette/go-safeconcurrency/commit/691f2ae890bc3b243b717e1d09b4116ef85cfdc7))
 * de-clutter GoDoc for work pools ([0edd18f](https://github.com/Izzette/go-safeconcurrency/commit/0edd18f1ebc17fea90a5d294b1e4e0237e97e046))
 * move task wrappers out of workpool and into workpool/task ([bbf3849](https://github.com/Izzette/go-safeconcurrency/commit/bbf384979adaf47e11dbce49e62dc6ce5d90441e))

@@ -1,4 +1,4 @@
-package pool
+package workpool
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/Izzette/go-safeconcurrency/api/results"
+	"github.com/Izzette/go-safeconcurrency/api/safeconcurrencyerrors"
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
@@ -235,7 +235,7 @@ func TestSubmitMultiResultStop(t *testing.T) {
 	err := SubmitMultiResultBuffered[any, string](ctx, p, task, 0, func(ctx context.Context, value string) error {
 		values = append(values, value)
 		if value == "b" {
-			return results.Stop
+			return safeconcurrencyerrors.Stop
 		}
 
 		return nil

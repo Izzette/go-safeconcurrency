@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/Izzette/go-safeconcurrency/api/results"
 	"github.com/Izzette/go-safeconcurrency/api/types"
+	"github.com/Izzette/go-safeconcurrency/results"
 )
 
 // NewGenerator creates (but does not start) a basic implementation of [types.Generator] with no results buffering.

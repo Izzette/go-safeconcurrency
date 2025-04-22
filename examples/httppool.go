@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/Izzette/go-safeconcurrency/api/pool"
 	"github.com/Izzette/go-safeconcurrency/api/types"
+	"github.com/Izzette/go-safeconcurrency/workpool"
 )
 
 // HttpTask implements [types.Task].
@@ -44,7 +44,7 @@ type HttpPool struct {
 func NewHttpPool(concurrency int) *HttpPool {
 	// The pool is created with a resource of type *http.Client, which is used to make HTTP requests.
 	client := &http.Client{}
-	p := pool.NewPool[*http.Client](client, concurrency)
+	p := workpool.NewPool[*http.Client](client, concurrency)
 	return &HttpPool{Pool: p}
 }
 
@@ -53,5 +53,5 @@ func (p *HttpPool) Get(ctx context.Context, url string) (*http.Response, error) 
 	// Create a new HTTP task with the URL to fetch.
 	task := &HttpTask{Method: "GET", URL: url}
 
-	return pool.Submit[*http.Client, *http.Response](ctx, p.Pool, task)
+	return workpool.Submit[*http.Client, *http.Response](ctx, p.Pool, task)
 }

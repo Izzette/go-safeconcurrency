@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Izzette/go-safeconcurrency/api/generator"
+	"github.com/Izzette/go-safeconcurrency/generator"
 )
 
-// Demonstrates how to use the [github.com/Izzette/go-safeconcurrency/api/generator] package to create a simple
+// Demonstrates how to use the [github.com/Izzette/go-safeconcurrency/generator] package to create a simple
 // [types.Generator] that produces integers from 0 to 9.
 // See [IteratorJob] for the implementation of the job that generates the integers.
 func Example_generator() {

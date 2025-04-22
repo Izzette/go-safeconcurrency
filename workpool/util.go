@@ -1,11 +1,11 @@
-package pool
+package workpool
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
-	"github.com/Izzette/go-safeconcurrency/api/results"
+	"github.com/Izzette/go-safeconcurrency/api/safeconcurrencyerrors"
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
@@ -50,8 +50,8 @@ func Submit[PoolResourceT any, ValueT any](
 // # Callback
 //
 // If the callback produces an error, the task will be canceled and the error will be returned.
-// If the special error [results.Stop] is be returned from the callback the task context will be canceled, the results
-// channel drained, and the callback will not be called again.
+// If the special error [safeconcurrencyerrors.Stop] is be returned from the callback the task context will be canceled,
+// the results channel drained, and the callback will not be called again.
 // As both the callback and the task may return an error, the errors will be joined and returned, therefore always
 // make sure to use [errors.Is] and [errors.As] to check for errors returned from this function.
 //
@@ -103,11 +103,11 @@ func SubmitMultiResultBuffered[PoolResourceT any, ValueT any](
 	}
 	taskErr := taskResults.Drain()
 
-	// The special error(s) results.Stop ought not to be returned.
-	if errors.Is(callbackErr, results.Stop) {
+	// The special error(s) safeconcurrencyerrors.Stop ought not to be returned.
+	if errors.Is(callbackErr, safeconcurrencyerrors.Stop) {
 		callbackErr = nil
 	}
-	if errors.Is(taskErr, results.Stop) {
+	if errors.Is(taskErr, safeconcurrencyerrors.Stop) {
 		taskErr = nil
 	}
 

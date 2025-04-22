@@ -4,19 +4,19 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Izzette/go-safeconcurrency/api/pool"
+	"github.com/Izzette/go-safeconcurrency/workpool"
 )
 
-// Simple example of how [pool.NewPool] can be used to create a [types.Pool] worker pool that executes tasks
+// Simple example of how [workpool.NewPool] can be used to create a [types.Pool] worker pool that executes tasks
 // concurrently.
-// Here we're submitting a function to exexcute in the pool with [pool.SubmitFunc].
+// Here we're submitting a function to execute in the pool with [workpool.SubmitFunc].
 func Example_easyPool() {
 	poolResource := 42
-	p := pool.NewPool[int](poolResource, 1)
+	p := workpool.NewPool[int](poolResource, 1)
 	defer p.Close()
 	p.Start()
 
-	err := pool.SubmitFunc[int](context.Background(), p, func(_ctx context.Context, resource int) error {
+	err := workpool.SubmitFunc[int](context.Background(), p, func(_ctx context.Context, resource int) error {
 		// This is the function that will be executed in the pool and use the pool resource.
 		fmt.Printf("value: %v\n", resource)
 		return nil

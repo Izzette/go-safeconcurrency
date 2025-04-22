@@ -37,11 +37,11 @@ Shows basic worker pool usage with a shared resource.
 _Here's an abridged version of the example_:
 ```go
 func Example_easyPool() {
-    p := pool.NewPool[int](42, 1)
+    p := workpool.NewPool[int](42, 1)
     defer p.Close()
     p.Start()
 
-    pool.SubmitFunc[int](context.Background(), p, func(_ context.Context, n int) error {
+    workpool.SubmitFunc[int](context.Background(), p, func(_ context.Context, n int) error {
         fmt.Printf("value: %d\n", n)
         return nil
     })
@@ -64,7 +64,7 @@ _Here's an abridged of the key method_:
 // Get makes concurrent HTTP requests
 func (p *HttpPool) Get(ctx context.Context, url string) (*http.Response, error) {
     task := &HttpTask{Method: "GET", URL: url}
-    return pool.Submit[*http.Client, *http.Response](ctx, p.Pool, task)
+    return workpool.Submit[*http.Client, *http.Response](ctx, p.Pool, task)
 }
 ```
 
@@ -82,9 +82,9 @@ Demonstrates a pool handling multiple task types with different result patterns.
 _Here's an abridged version of the example_:
 ```go
 // Submit different task types
-pool.Submit[any, int](ctx, pool, &IntTask{42})       // Single-result task
-pool.SubmitMultiResult[any, string](ctx, pool, task) // Multi-result task
-pool.SubmitFunc[any](ctx, pool, func() error { ... }) // Function task
+workpool.Submit[any, int](ctx, pool, &IntTask{42})       // Single-result task
+workpool.SubmitMultiResult[any, string](ctx, pool, task) // Multi-result task
+workpool.SubmitFunc[any](ctx, pool, func() error { ... }) // Function task
 ```
 
 Run with:

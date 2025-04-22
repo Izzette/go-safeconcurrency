@@ -1,4 +1,4 @@
-package pool
+package workpool
 
 import (
 	"context"

@@ -26,7 +26,7 @@ type Pool[PoolResourceT any] interface {
 
 // Task is a simple task representing a unit of work that can be execution in a [Pool].
 // Task produces a single value result, and an error.
-// Task may be wrapped in a [ValuelessTask] with [github.com/Izzette/go-safeconcurrency/api/pool.WrapTask].
+// The task may be submitted to a [Pool] using [github.com/Izzette/go-safeconcurrency/workpool.Submit].
 // PoolResourceT is the same type as the resource used by the [Pool].
 // ValueT is the type of value(s) produced by the task.
 // If you do not need to return a value but only an error, you can simply set ValueT to any and return nil from the
@@ -37,8 +37,8 @@ type Task[PoolResourceT any, ValueT any] interface {
 }
 
 // MultiResultTask represents a unit of work that can be executed in a [Pool].
-// MultiResultTask may be wrapped in a [ValuelessTask] with
-// [github.com/Izzette/go-safeconcurrency/api/pool.WrapMultiResultTask].
+// MultiResultTask can be submitted to a [Pool] using
+// [github.com/Izzette/go-safeconcurrency/workpool.SubmitMultiResult].
 // PoolResourceT is the same type as the resource used by the [Pool].
 // ValueT is the type of value(s) produced by the task.
 type MultiResultTask[PoolResourceT any, ValueT any] interface {
@@ -49,15 +49,16 @@ type MultiResultTask[PoolResourceT any, ValueT any] interface {
 // ValuelessTask is a minimal version of Task that does not produce results.
 // Instances of [types.MultiValueTask] and [Task] are wrapped in a [ValuelessTask] in order to allow [Pool] to run tasks
 // that produce different results.
-// See [github.com/Izzette/go-safeconcurrency/api/pool.WrapMultiResultTask] and
-// [github.com/Izzette/go-safeconcurrency/api/pool.TaskWrapper] for info on this functionality.
-// You are not expected to implement this interface directly, but rather use the provided wrappers.
+// See [github.com/Izzette/go-safeconcurrency/workpool.Submit] and
+// [github.com/Izzette/go-safeconcurrency/workpool.SubmitMultiResult] for information on this functionality.
+// You are not expected to implement this interface directly, but rather use the provided helpers to wrap and submit
+// tasks.
 type ValuelessTask[PoolResourceT any] interface {
 	// Execute runs the task with the pool resource.
 	Execute(context.Context, PoolResourceT)
 }
 
-// TaskFunc can be passed to [github.com/Izzette/go-safeconcurrency/api/pool.SubmitFunc] to execute the function as a
+// TaskFunc can be passed to [github.com/Izzette/go-safeconcurrency/workpool.SubmitFunc] to execute the function as a
 // task.
 type TaskFunc[PoolResourceT any] func(context.Context, PoolResourceT) error
 
@@ -76,6 +77,11 @@ type TaskResult[ValueT any] interface {
 	Drain() error
 }
 
-// TaskCallback is a callback used by [github.com/Izzette/go-safeconcurrency/api/pool.SubmitMultiResult] to process the
+// TaskCallback is a callback used by [github.com/Izzette/go-safeconcurrency/workpool.SubmitMultiResult] to process the
 // results of a [types.MultiValueTask] as they are produced.
+// If the callback returns any error, the task context will be canceled and the callback will not be called with new
+// results.
+// The error returned by the callback is propagated to the caller along with any error produced by the task.
+// If the error is the special [github.com/Izzette/go-safeconcurrency/api/safeconcurrencyerrors.Stop] error, the task
+// will be stopped as normal, however the error will not be returned to the caller (simulating break).
 type TaskCallback[ValueT any] func(context.Context, ValueT) error

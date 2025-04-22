@@ -73,7 +73,7 @@ Expect new features and improvements in future releases, generators and work poo
 
    Create and manage worker pools:
    ```go
-   mypool := pool.NewPool[ResourceType](resource, concurrency)
+   mypool := workpool.NewPool[ResourceType](resource, concurrency)
    mypool.Start()
    defer mypool.Close()
    ```
@@ -81,7 +81,7 @@ Expect new features and improvements in future releases, generators and work poo
    Submit tasks to the pool and receive results:
    ```go
    // Submit tasks
-   val, err := pool.Submit[ResourceType, Output](ctx, mypool, &task{})
+   val, err := workpool.Submit[ResourceType, Output](ctx, mypool, &task{})
    // Handle result
    ```
 
@@ -94,8 +94,8 @@ with them in the browser on
 Full API documentation is available on [GoDoc](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency).
 
 - For types and interfaces, see [api/types](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/api/types).
-- For creating generators, see [api/generator](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/api/generator).
-- For creating worker pools and tasks, see [api/pool](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/api/pool).
+- For creating generators, see [generator](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/generator).
+- For creating worker pools and tasks, see [pool](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/workpool).
 - Examples can be interacted with in the browser at [examples](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/examples).
 
 ## Contributing

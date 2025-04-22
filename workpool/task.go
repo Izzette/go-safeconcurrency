@@ -1,10 +1,10 @@
-package pool
+package workpool
 
 import (
 	"context"
 
-	"github.com/Izzette/go-safeconcurrency/api/results"
 	"github.com/Izzette/go-safeconcurrency/api/types"
+	"github.com/Izzette/go-safeconcurrency/results"
 )
 
 // WrapTask wraps a [types.Task] so that it can be executed in a [types.Pool] and returns a channel for

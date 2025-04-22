@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.1](https://github.com/Izzette/go-safeconcurrency/compare/v0.3.0...v0.3.1) (2025-04-22)
+
+
+### Features
+
+* rename packages ([eb8be36](https://github.com/Izzette/go-safeconcurrency/commit/eb8be3607ecc2069c68002f711e20ba70bc5c6dc))
+  * Base package renamed to `safeconcurrency` by adding a `package.go`,
+    this only effects the display module name for the pkg.go.dev site.
+  * Moved implementations down from `api/`.
+  * Renamed `pool` to `workpool`.
+
 ## [0.3.0](https://github.com/Izzette/go-safeconcurrency/compare/v0.2.1...v0.3.0) (2025-04-21)
 
 

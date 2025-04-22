@@ -3,9 +3,9 @@ package types
 import "context"
 
 // Pool is a worker pool that executes arbitrary tasks concurrently.
-// PoolResourceT is the type of resource used by the pool (ex. API client), it may be set to type any if a shared pool
+// ResourceT is the type of resource used by the pool (ex. API client), it may be set to type any if a shared pool
 // resource is not required.
-type Pool[PoolResourceT any] interface {
+type Pool[ResourceT any] interface {
 	// Start initializes the pool and prepares it for task execution.
 	Start()
 
@@ -21,29 +21,29 @@ type Pool[PoolResourceT any] interface {
 	// Alternatively using context.WithCancel and deferring a call to the context.CancelFunc will stop the task from
 	// blocking the Pool if the caller is no longer interested in the result.
 	// ⚠️You must never attempt to submit tasks to a pool which has been closed, this will result in a panic!
-	Submit(context.Context, ValuelessTask[PoolResourceT]) error
+	Submit(context.Context, ValuelessTask[ResourceT]) error
 }
 
 // Task is a simple task representing a unit of work that can be execution in a [Pool].
 // Task produces a single value result, and an error.
 // The task may be submitted to a [Pool] using [github.com/Izzette/go-safeconcurrency/workpool.Submit].
-// PoolResourceT is the same type as the resource used by the [Pool].
+// ResourceT is the same type as the resource used by the [Pool].
 // ValueT is the type of value(s) produced by the task.
 // If you do not need to return a value but only an error, you can simply set ValueT to any and return nil from the
 // task.
-type Task[PoolResourceT any, ValueT any] interface {
+type Task[ResourceT any, ValueT any] interface {
 	// Execute runs the task with the pool resource and returns the result.
-	Execute(context.Context, PoolResourceT) (ValueT, error)
+	Execute(context.Context, ResourceT) (ValueT, error)
 }
 
 // MultiResultTask represents a unit of work that can be executed in a [Pool].
 // MultiResultTask can be submitted to a [Pool] using
 // [github.com/Izzette/go-safeconcurrency/workpool.SubmitMultiResult].
-// PoolResourceT is the same type as the resource used by the [Pool].
+// ResourceT is the same type as the resource used by the [Pool].
 // ValueT is the type of value(s) produced by the task.
-type MultiResultTask[PoolResourceT any, ValueT any] interface {
+type MultiResultTask[ResourceT any, ValueT any] interface {
 	// Execute runs the task with the pool resource and publishes results to the provided handle.
-	Execute(context.Context, PoolResourceT, Handle[ValueT]) error
+	Execute(context.Context, ResourceT, Handle[ValueT]) error
 }
 
 // ValuelessTask is a minimal version of Task that does not produce results.
@@ -53,14 +53,14 @@ type MultiResultTask[PoolResourceT any, ValueT any] interface {
 // [github.com/Izzette/go-safeconcurrency/workpool.SubmitMultiResult] for information on this functionality.
 // You are not expected to implement this interface directly, but rather use the provided helpers to wrap and submit
 // tasks.
-type ValuelessTask[PoolResourceT any] interface {
+type ValuelessTask[ResourceT any] interface {
 	// Execute runs the task with the pool resource.
-	Execute(context.Context, PoolResourceT)
+	Execute(context.Context, ResourceT)
 }
 
 // TaskFunc can be passed to [github.com/Izzette/go-safeconcurrency/workpool.SubmitFunc] to execute the function as a
 // task.
-type TaskFunc[PoolResourceT any] func(context.Context, PoolResourceT) error
+type TaskFunc[ResourceT any] func(context.Context, ResourceT) error
 
 // TaskResult is the result of a task execution.
 // It is used to propagate results and recoverable errors from the task to the caller.

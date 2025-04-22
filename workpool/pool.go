@@ -33,6 +33,7 @@ func NewPoolBuffered[PoolResourceT any](
 		concurrency: uint(concurrency),
 		wg:          &sync.WaitGroup{},
 		started:     &atomic.Bool{},
+		closeOnce:   &sync.Once{},
 	}
 	// We will run concurrency workers when Start() is called.
 	// This WaitGroup must be pre-populated in the case that Wait() is called in another goroutine before Start().
@@ -54,6 +55,7 @@ type pool[PoolResourceT any] struct {
 	concurrency uint
 	wg          *sync.WaitGroup
 	started     *atomic.Bool
+	closeOnce   *sync.Once
 }
 
 // Start implements [types.Pool.Start].
@@ -72,7 +74,7 @@ func (p *pool[PoolResourceT]) Start() {
 
 // Close implements [types.Pool.Close].
 func (p *pool[PoolResourceT]) Close() {
-	close(p.requests)
+	p.closeOnce.Do(p.closeRequests)
 	if !p.started.Load() {
 		return
 	}
@@ -109,4 +111,9 @@ func (p *pool[PoolResourceT]) worker() {
 	for task := range p.requests {
 		task.Execute(task.getContext(), p.resource)
 	}
+}
+
+// closeRequests closes the requests channel without synchronizing with [pool.closeOnce].
+func (p *pool[PoolResourceT]) closeRequests() {
+	close(p.requests)
 }

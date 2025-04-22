@@ -25,6 +25,9 @@ jobs:
       - name: Test
         run: go test -v -race -cover ./...
 
+      - name: Benchmark
+        run: go test -v -run '^Benchmark' -bench . ./...
+
       - name: Test flakiness
         # Run the unit tests with a high count to check for flakiness
         # Yes, we really can run the tests 100000 times in just a few seconds

@@ -2,6 +2,7 @@ package results
 
 import (
 	"context"
+	"sync"
 
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
@@ -9,12 +10,13 @@ import (
 // NewHandle creates a new SimpleHandle, which implements [types.Handle] and is used to publish results from a
 // [types.Runner] or [types.Task].
 func NewHandle[T any](results chan<- T) types.Handle[T] {
-	return &handle[T]{results: results}
+	return &handle[T]{results: results, closeOnce: &sync.Once{}}
 }
 
 // handle implements [types.Handle].
 type handle[T any] struct {
-	results chan<- T
+	results   chan<- T
+	closeOnce *sync.Once
 }
 
 // Publish implements [types.Handle.Publish].
@@ -40,6 +42,10 @@ func (h *handle[T]) Publish(ctx context.Context, value T) error {
 // Close implements [types.Handle.Close].
 // It closes the underlying results channel.
 func (h *handle[T]) Close() {
-	// Close the results channel.
+	h.closeOnce.Do(h.closeResults)
+}
+
+// closeResults closes the results channel without synchronizing with [handle.closeOnce].
+func (h *handle[T]) closeResults() {
 	close(h.results)
 }

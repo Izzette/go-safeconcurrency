@@ -95,7 +95,7 @@ Full API documentation is available on [GoDoc](https://pkg.go.dev/github.com/Izz
 
 - For types and interfaces, see [api/types](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/api/types).
 - For creating generators, see [generator](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/generator).
-- For creating worker pools and tasks, see [pool](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/workpool).
+- For creating worker pools and tasks, see [workpool](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/workpool).
 - Examples can be interacted with in the browser at [examples](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/examples).
 
 ## Contributing

@@ -12,6 +12,15 @@ import (
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
+type mockTask struct {
+	val int
+	err error
+}
+
+func (t *mockTask) Execute(ctx context.Context, res interface{}) (int, error) {
+	return t.val, t.err
+}
+
 func TestSubmitSuccess(t *testing.T) {
 	ctx := context.Background()
 	p := NewPool[any](nil, 1)
@@ -146,6 +155,16 @@ func TestSubmitMultiResultTaskError(t *testing.T) {
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("Expected error %v, got %v", expectedErr, err)
 	}
+}
+
+type mockMultiResultTask struct{ t *testing.T }
+
+func (t *mockMultiResultTask) Execute(ctx context.Context, res interface{}, h types.Handle[string]) error {
+	if err := h.Publish(ctx, "test"); err != nil {
+		t.t.Errorf("Failed to publish result: %v", err)
+	}
+
+	return nil
 }
 
 func TestSubmitMultiResultEarlyContextCanceled(t *testing.T) {

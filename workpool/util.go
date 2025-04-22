@@ -7,18 +7,19 @@ import (
 
 	"github.com/Izzette/go-safeconcurrency/api/safeconcurrencyerrors"
 	"github.com/Izzette/go-safeconcurrency/api/types"
+	"github.com/Izzette/go-safeconcurrency/workpool/task"
 )
 
 // Submit is a helper function to submit a [types.Task] to a [types.Pool] and wait for the result.
-func Submit[PoolResourceT any, ValueT any](
+func Submit[ResourceT any, ValueT any](
 	ctx context.Context,
-	pool types.Pool[PoolResourceT],
-	task types.Task[PoolResourceT, ValueT],
+	pool types.Pool[ResourceT],
+	tsk types.Task[ResourceT, ValueT],
 ) (ValueT, error) {
 	var zero ValueT
 
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := WrapTask[PoolResourceT, ValueT](task)
+	valuelessTask, taskResults := task.WrapTask[ResourceT, ValueT](tsk)
 
 	// Submit the task to the pool.
 	// If context is canceled before the task is published it will instead return an error.
@@ -62,16 +63,16 @@ func Submit[PoolResourceT any, ValueT any](
 //
 // # Other
 //
-// If you need more control, use [WrapMultiResultTaskBuffered] and call [types.Pool.Submit] directly.
-func SubmitMultiResultBuffered[PoolResourceT any, ValueT any](
+// If you need more control, use [task.WrapMultiResultTaskBuffered] and call [types.Pool.Submit] directly.
+func SubmitMultiResultBuffered[ResourceT any, ValueT any](
 	ctx context.Context,
-	pool types.Pool[PoolResourceT],
-	task types.MultiResultTask[PoolResourceT, ValueT],
+	pool types.Pool[ResourceT],
+	tsk types.MultiResultTask[ResourceT, ValueT],
 	buffer uint,
 	callback types.TaskCallback[ValueT],
 ) error {
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := WrapMultiResultTaskBuffered[PoolResourceT](task, buffer)
+	valuelessTask, taskResults := task.WrapMultiResultTaskBuffered[ResourceT](tsk, buffer)
 
 	// Only drain the results channel if the task was submitted successfully.
 	// We should always have already drained the results channel below, but this is a
@@ -119,10 +120,10 @@ func SubmitMultiResultBuffered[PoolResourceT any, ValueT any](
 // It is equivalent to calling [SubmitMultiResultBuffered] with a buffer size of 1.
 // If you would like results buffering, use [SubmitMultiResultBuffered] instead.
 // See [SubmitMultiResultBuffered] for more details.
-func SubmitMultiResult[PoolResourceT any, ValueT any](
+func SubmitMultiResult[ResourceT any, ValueT any](
 	ctx context.Context,
-	pool types.Pool[PoolResourceT],
-	task types.MultiResultTask[PoolResourceT, ValueT],
+	pool types.Pool[ResourceT],
+	task types.MultiResultTask[ResourceT, ValueT],
 	callback types.TaskCallback[ValueT],
 ) error {
 	return SubmitMultiResultBuffered(ctx, pool, task, 1, callback)
@@ -137,10 +138,10 @@ func SubmitMultiResult[PoolResourceT any, ValueT any](
 // SubmitMultiResultCollectAll useful for testing, debugging, and demonstration purposes where the performance
 // difference is unimportant and the ability to consume the results as they are produced is not required.
 // You should most likely use [SubmitMultiResult] instead.
-func SubmitMultiResultCollectAll[PoolResourceT any, ValueT any](
+func SubmitMultiResultCollectAll[ResourceT any, ValueT any](
 	ctx context.Context,
-	pool types.Pool[PoolResourceT],
-	task types.MultiResultTask[PoolResourceT, ValueT],
+	pool types.Pool[ResourceT],
+	task types.MultiResultTask[ResourceT, ValueT],
 ) ([]ValueT, error) {
 	results := make([]ValueT, 0)
 	if err := SubmitMultiResult(ctx, pool, task, func(ctx context.Context, value ValueT) error {
@@ -155,13 +156,13 @@ func SubmitMultiResultCollectAll[PoolResourceT any, ValueT any](
 }
 
 // SubmitFunc is a helper function to submit a [types.TaskFunc] to a [types.Pool].
-func SubmitFunc[PoolResourceT any](
+func SubmitFunc[ResourceT any](
 	ctx context.Context,
-	pool types.Pool[PoolResourceT],
-	taskFunc types.TaskFunc[PoolResourceT],
+	pool types.Pool[ResourceT],
+	taskFunc types.TaskFunc[ResourceT],
 ) error {
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := WrapTaskFunc[PoolResourceT](taskFunc)
+	valuelessTask, taskResults := task.WrapTaskFunc[ResourceT](taskFunc)
 
 	// Submit the task to the pool.
 	// If context is canceled before the task is published it will instead return an error.

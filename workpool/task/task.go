@@ -1,4 +1,4 @@
-package workpool
+package task
 
 import (
 	"context"
@@ -14,13 +14,13 @@ import (
 // If the [context.Context] passed to [types.Pool.Submit] is canceled before the task is finished, the task will
 // not produce any results and the result channel will be closed.
 //
-// It is recommended not to use this wrapper directly, but rather use the [Submit] helper function.
-// The [Submit] helper will wrap the [types.Task], submit it to the pool, and wait for the result.
-// The [Submit] helper implements error handling correctly and is less error prone than using this wrapper and calling
-// [types.Pool.Submit] directly.
-func WrapTask[PoolResourceT any, ValueT any](
-	task types.Task[PoolResourceT, ValueT],
-) (types.ValuelessTask[PoolResourceT], types.TaskResult[ValueT]) {
+// It is recommended not to use this wrapper directly, but rather use the [workpool.Submit] helper function.
+// The [workpool.Submit] helper will wrap the [types.Task], submit it to the pool, and wait for the result.
+// The [workpool.Submit] helper implements error handling correctly and is less error prone than using this wrapper and
+// calling [types.Pool.Submit] directly.
+func WrapTask[ResourceT any, ValueT any](
+	task types.Task[ResourceT, ValueT],
+) (types.ValuelessTask[ResourceT], types.TaskResult[ValueT]) {
 	res := make(chan ValueT, 1)
 	// taskResult.err and wrappedTask.err must point to the same error variable.
 	var err error
@@ -28,7 +28,7 @@ func WrapTask[PoolResourceT any, ValueT any](
 		results: res,
 		err:     &err,
 	}
-	wrappedTask := &taskWrapper[PoolResourceT, ValueT]{task, res, &err}
+	wrappedTask := &taskWrapper[ResourceT, ValueT]{task, res, &err}
 
 	return wrappedTask, taskResult
 }
@@ -38,15 +38,16 @@ func WrapTask[PoolResourceT any, ValueT any](
 // The buffer size of the results channel is specified by the buffer parameter.
 // It is recommended avoid using a buffer size of 0, as this will block the worker until the result is received.
 //
-// It is recommended not to use this wrapper directly, but rather use the [SubmitMultiResultBuffered] helper function.
-// The [SubmitMultiResultBuffered] helper will wrap the [types.MultiResultTask], submit it to the pool, and call the
-// callback for each result as it is produced.
-// The [SubmitMultiResultBuffered] helper implements error handling correctly and is less error prone than using
-// this wrapper and calling [types.Pool.Submit] directly.
-func WrapMultiResultTaskBuffered[PoolResourceT any, ValueT any](
-	task types.MultiResultTask[PoolResourceT, ValueT],
+// It is recommended not to use this wrapper directly, but rather use the [workpool.SubmitMultiResultBuffered] helper
+// function.
+// The [workpool.SubmitMultiResultBuffered] helper will wrap the [types.MultiResultTask], submit it to the pool, and
+// call the callback for each result as it is produced.
+// The [workpool.SubmitMultiResultBuffered] helper implements error handling correctly and is less error prone than
+// using this wrapper and calling [types.Pool.Submit] directly.
+func WrapMultiResultTaskBuffered[ResourceT any, ValueT any](
+	task types.MultiResultTask[ResourceT, ValueT],
 	buffer uint,
-) (types.ValuelessTask[PoolResourceT], types.TaskResult[ValueT]) {
+) (types.ValuelessTask[ResourceT], types.TaskResult[ValueT]) {
 	res := make(chan ValueT, buffer)
 	handle := results.NewHandle(res)
 	var err error
@@ -54,7 +55,7 @@ func WrapMultiResultTaskBuffered[PoolResourceT any, ValueT any](
 		results: res,
 		err:     &err,
 	}
-	wrappedTask := multiResultTaskWrapper[PoolResourceT, ValueT]{
+	wrappedTask := multiResultTaskWrapper[ResourceT, ValueT]{
 		task:   task,
 		handle: handle,
 		err:    &err,
@@ -64,20 +65,20 @@ func WrapMultiResultTaskBuffered[PoolResourceT any, ValueT any](
 }
 
 // WrapMultiResultTask wraps a [types.MultiResultTask] with a buffer size of 1.
-// This is equivalent to calling [WrapMultiResultTaskBuffered] with a buffer size of 1.
-func WrapMultiResultTask[PoolResourceT any, ValueT any](
-	task types.MultiResultTask[PoolResourceT, ValueT],
-) (types.ValuelessTask[PoolResourceT], types.TaskResult[ValueT]) {
+// This is equivalent to calling [workpool.WrapMultiResultTaskBuffered] with a buffer size of 1.
+func WrapMultiResultTask[ResourceT any, ValueT any](
+	task types.MultiResultTask[ResourceT, ValueT],
+) (types.ValuelessTask[ResourceT], types.TaskResult[ValueT]) {
 	return WrapMultiResultTaskBuffered(task, 1)
 }
 
 // WrapTaskFunc wraps a [types.TaskFunc] so that it can be executed in a [types.Pool] and returns a [types.TaskResult]
 // for execution monitoring and error propagation.
-// It is not recommended to use this wrapper directly, but rather use the [SubmitFunc] helper function.
-func WrapTaskFunc[PoolResourceT any](f types.TaskFunc[PoolResourceT]) (
-	types.ValuelessTask[PoolResourceT], types.TaskResult[struct{}],
+// It is not recommended to use this wrapper directly, but rather use the [workpool.SubmitFunc] helper function.
+func WrapTaskFunc[ResourceT any](f types.TaskFunc[ResourceT]) (
+	types.ValuelessTask[ResourceT], types.TaskResult[struct{}],
 ) {
-	return WrapTask[PoolResourceT, struct{}](taskFuncWrapper[PoolResourceT]{f})
+	return WrapTask[ResourceT, struct{}](taskFuncWrapper[ResourceT]{f})
 }
 
 // taskResult implements [types.TaskResult].
@@ -103,30 +104,30 @@ func (tr *taskResult[ValueT]) Drain() error {
 }
 
 // multiResultTaskWrapper is a wrapper for a [types.MultiResultTask] implementing [types.ValuelessTask].
-type multiResultTaskWrapper[PoolResourceT any, ValueT any] struct {
-	task   types.MultiResultTask[PoolResourceT, ValueT]
+type multiResultTaskWrapper[ResourceT any, ValueT any] struct {
+	task   types.MultiResultTask[ResourceT, ValueT]
 	handle types.Handle[ValueT]
 	err    *error
 }
 
 // Execute implements [types.MultiResultTask.Execute].
-func (t multiResultTaskWrapper[PoolResourceT, ValueT]) Execute(ctx context.Context, resource PoolResourceT) {
+func (t multiResultTaskWrapper[ResourceT, ValueT]) Execute(ctx context.Context, resource ResourceT) {
 	defer t.handle.Close()
 	// We must not overwrite the error pointer, but instead store the error at the address of the pointer.
 	*t.err = t.task.Execute(ctx, resource, t.handle)
 }
 
 // taskWrapper is a wrapper for a [types.Task] implementing [types.ValuelessTask].
-type taskWrapper[PoolResourceT any, ValueT any] struct {
-	task types.Task[PoolResourceT, ValueT]
+type taskWrapper[ResourceT any, ValueT any] struct {
+	task types.Task[ResourceT, ValueT]
 	r    chan<- ValueT
 	err  *error
 }
 
 // Execute implements [types.ValuelessTask.Execute].
-func (t taskWrapper[PoolResourceT, ValueT]) Execute(
+func (t taskWrapper[ResourceT, ValueT]) Execute(
 	ctx context.Context,
-	resource PoolResourceT,
+	resource ResourceT,
 ) {
 	defer close(t.r)
 	// taskWithHandleWrapper will close the handle for us when the task is done.
@@ -139,14 +140,14 @@ func (t taskWrapper[PoolResourceT, ValueT]) Execute(
 }
 
 // taskFunc is a function that implements [types.Task].
-type taskFuncWrapper[PoolResourceT any] struct {
-	f types.TaskFunc[PoolResourceT]
+type taskFuncWrapper[ResourceT any] struct {
+	f types.TaskFunc[ResourceT]
 }
 
 // Execute implements [types.Task.Execute].
-func (t taskFuncWrapper[PoolResourceT]) Execute(
+func (t taskFuncWrapper[ResourceT]) Execute(
 	ctx context.Context,
-	resource PoolResourceT,
+	resource ResourceT,
 ) (struct{}, error) {
 	return struct{}{}, t.f(ctx, resource)
 }

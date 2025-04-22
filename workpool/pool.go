@@ -11,7 +11,7 @@ import (
 // NewPool creates (but does not start) a basic implementation of [types.Pool] with no requests buffering.
 // If you would like requests buffering, use [NewPoolBuffered] instead.
 // It is equivalent to calling [NewPoolBuffered] with a buffer size of 0.
-func NewPool[PoolResourceT any](resource PoolResourceT, concurrency int) types.Pool[PoolResourceT] {
+func NewPool[ResourceT any](resource ResourceT, concurrency int) types.Pool[ResourceT] {
 	return NewPoolBuffered(resource, concurrency, 0)
 }
 
@@ -19,17 +19,15 @@ func NewPool[PoolResourceT any](resource PoolResourceT, concurrency int) types.P
 // It uses the specified pool resource (passed to each task), concurrency workers, and the specified buffer size for the
 // requests channel (used by [types.Pool.Submit] to queue tasks).
 //
-// The resource argument may be set to nil and PoolResourceT set to type any if a shared pool resource is not required.
-func NewPoolBuffered[PoolResourceT any](
-	resource PoolResourceT, concurrency int, buffer uint,
-) types.Pool[PoolResourceT] {
+// The resource argument may be set to nil and ResourceT set to type any if a shared pool resource is not required.
+func NewPoolBuffered[ResourceT any](resource ResourceT, concurrency int, buffer uint) types.Pool[ResourceT] {
 	if concurrency <= 0 {
 		panic("Worker pool must have at least one worker!")
 	}
 
-	pool := &pool[PoolResourceT]{
+	pool := &pool[ResourceT]{
 		resource:    resource,
-		requests:    make(chan contextualTask[PoolResourceT], buffer),
+		requests:    make(chan contextualTask[ResourceT], buffer),
 		concurrency: uint(concurrency),
 		wg:          &sync.WaitGroup{},
 		started:     &atomic.Bool{},
@@ -43,15 +41,15 @@ func NewPoolBuffered[PoolResourceT any](
 }
 
 // contextualTask is a wrapper for [types.ValuelessTask] that adds a [context.Context] to the task.
-type contextualTask[PoolResourceT any] struct {
-	types.ValuelessTask[PoolResourceT]
+type contextualTask[ResourceT any] struct {
+	types.ValuelessTask[ResourceT]
 	getContext func() context.Context
 }
 
 // pool implements [types.Pool].
-type pool[PoolResourceT any] struct {
-	resource    PoolResourceT
-	requests    chan contextualTask[PoolResourceT]
+type pool[ResourceT any] struct {
+	resource    ResourceT
+	requests    chan contextualTask[ResourceT]
 	concurrency uint
 	wg          *sync.WaitGroup
 	started     *atomic.Bool
@@ -60,7 +58,7 @@ type pool[PoolResourceT any] struct {
 
 // Start implements [types.Pool.Start].
 // Starts the worker pool with the configured concurrency.
-func (p *pool[PoolResourceT]) Start() {
+func (p *pool[ResourceT]) Start() {
 	// Check if the pool has already been started.
 	if p.started.Swap(true) {
 		panic("attempt to start previously started pool.Pool")
@@ -73,7 +71,7 @@ func (p *pool[PoolResourceT]) Start() {
 }
 
 // Close implements [types.Pool.Close].
-func (p *pool[PoolResourceT]) Close() {
+func (p *pool[ResourceT]) Close() {
 	p.closeOnce.Do(p.closeRequests)
 	if !p.started.Load() {
 		return
@@ -82,14 +80,14 @@ func (p *pool[PoolResourceT]) Close() {
 }
 
 // Submit implements [types.Pool.Submit].
-func (p *pool[PoolResourceT]) Submit(ctx context.Context, task types.ValuelessTask[PoolResourceT]) error {
+func (p *pool[ResourceT]) Submit(ctx context.Context, task types.ValuelessTask[ResourceT]) error {
 	// select is not deterministic, and may still send tasks even if the context has been canceled.
 	if err := context.Cause(ctx); err != nil {
 		//nolint:wrapcheck
 		return err
 	}
 
-	ctxTask := contextualTask[PoolResourceT]{
+	ctxTask := contextualTask[ResourceT]{
 		ValuelessTask: task,
 		getContext:    func() context.Context { return ctx },
 	}
@@ -105,7 +103,7 @@ func (p *pool[PoolResourceT]) Submit(ctx context.Context, task types.ValuelessTa
 }
 
 // worker is a goroutine that executes tasks from the requests channel.
-func (p *pool[PoolResourceT]) worker() {
+func (p *pool[ResourceT]) worker() {
 	defer p.wg.Done()
 
 	for task := range p.requests {
@@ -114,6 +112,6 @@ func (p *pool[PoolResourceT]) worker() {
 }
 
 // closeRequests closes the requests channel without synchronizing with [pool.closeOnce].
-func (p *pool[PoolResourceT]) closeRequests() {
+func (p *pool[ResourceT]) closeRequests() {
 	close(p.requests)
 }

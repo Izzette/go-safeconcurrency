@@ -1,4 +1,4 @@
-package workpool
+package task
 
 import (
 	"context"
@@ -14,10 +14,10 @@ import (
 // If the [context.Context] passed to [types.Pool.Submit] is canceled before the task is finished, the task will
 // not produce any results and the result channel will be closed.
 //
-// It is recommended not to use this wrapper directly, but rather use the [Submit] helper function.
-// The [Submit] helper will wrap the [types.Task], submit it to the pool, and wait for the result.
-// The [Submit] helper implements error handling correctly and is less error prone than using this wrapper and calling
-// [types.Pool.Submit] directly.
+// It is recommended not to use this wrapper directly, but rather use the [workpool.Submit] helper function.
+// The [workpool.Submit] helper will wrap the [types.Task], submit it to the pool, and wait for the result.
+// The [workpool.Submit] helper implements error handling correctly and is less error prone than using this wrapper and
+// calling [types.Pool.Submit] directly.
 func WrapTask[PoolResourceT any, ValueT any](
 	task types.Task[PoolResourceT, ValueT],
 ) (types.ValuelessTask[PoolResourceT], types.TaskResult[ValueT]) {
@@ -38,11 +38,12 @@ func WrapTask[PoolResourceT any, ValueT any](
 // The buffer size of the results channel is specified by the buffer parameter.
 // It is recommended avoid using a buffer size of 0, as this will block the worker until the result is received.
 //
-// It is recommended not to use this wrapper directly, but rather use the [SubmitMultiResultBuffered] helper function.
-// The [SubmitMultiResultBuffered] helper will wrap the [types.MultiResultTask], submit it to the pool, and call the
-// callback for each result as it is produced.
-// The [SubmitMultiResultBuffered] helper implements error handling correctly and is less error prone than using
-// this wrapper and calling [types.Pool.Submit] directly.
+// It is recommended not to use this wrapper directly, but rather use the [workpool.SubmitMultiResultBuffered] helper
+// function.
+// The [workpool.SubmitMultiResultBuffered] helper will wrap the [types.MultiResultTask], submit it to the pool, and
+// call the callback for each result as it is produced.
+// The [workpool.SubmitMultiResultBuffered] helper implements error handling correctly and is less error prone than
+// using this wrapper and calling [types.Pool.Submit] directly.
 func WrapMultiResultTaskBuffered[PoolResourceT any, ValueT any](
 	task types.MultiResultTask[PoolResourceT, ValueT],
 	buffer uint,
@@ -64,7 +65,7 @@ func WrapMultiResultTaskBuffered[PoolResourceT any, ValueT any](
 }
 
 // WrapMultiResultTask wraps a [types.MultiResultTask] with a buffer size of 1.
-// This is equivalent to calling [WrapMultiResultTaskBuffered] with a buffer size of 1.
+// This is equivalent to calling [workpool.WrapMultiResultTaskBuffered] with a buffer size of 1.
 func WrapMultiResultTask[PoolResourceT any, ValueT any](
 	task types.MultiResultTask[PoolResourceT, ValueT],
 ) (types.ValuelessTask[PoolResourceT], types.TaskResult[ValueT]) {
@@ -73,7 +74,7 @@ func WrapMultiResultTask[PoolResourceT any, ValueT any](
 
 // WrapTaskFunc wraps a [types.TaskFunc] so that it can be executed in a [types.Pool] and returns a [types.TaskResult]
 // for execution monitoring and error propagation.
-// It is not recommended to use this wrapper directly, but rather use the [SubmitFunc] helper function.
+// It is not recommended to use this wrapper directly, but rather use the [workpool.SubmitFunc] helper function.
 func WrapTaskFunc[PoolResourceT any](f types.TaskFunc[PoolResourceT]) (
 	types.ValuelessTask[PoolResourceT], types.TaskResult[struct{}],
 ) {

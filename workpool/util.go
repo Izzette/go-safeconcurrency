@@ -91,7 +91,7 @@ func Submit[ResourceT any, ValueT any](
 //
 // # Other
 //
-// If you need more control, use [task.WrapMultiResultTaskBuffered] and publish to the [types.Pool.Requests] channe
+// If you need more control, use [task.WrapMultiResultTaskBuffered] and publish to the [types.Pool.Requests] channel
 // directly.
 func SubmitMultiResultBuffered[ResourceT any, ValueT any](
 	ctx context.Context,

@@ -11,6 +11,23 @@ import (
 )
 
 // Submit is a helper function to submit a [types.Task] to a [types.Pool] and wait for the result.
+// The result and error returned from the task are returned to the caller.
+//
+// # Context
+//
+// The provided [context.Context] is passed to the task when it is executed in the [types.Pool].
+// It is advisable to use [context.WithDeadline] or [context.WithTimeout] to limit the time the task is allowed to run
+// and ensure the Pool can be shared with other tasks.
+// Alternatively, using [context.WithCancel] and deferring a call to the context.CancelFunc will stop the task from
+// blocking the Pool if the caller is no longer interested in the result.
+//
+// # Warning
+//
+// ⚠️You must never attempt to submit tasks to a pool which has been closed, this will result in a panic!
+//
+// # Other
+//
+// If you need more control, use [task.WrapTaskBuffered] and publish to the [types.Pool.Requests] channel directly.
 func Submit[ResourceT any, ValueT any](
 	ctx context.Context,
 	pool types.Pool[ResourceT],
@@ -18,14 +35,22 @@ func Submit[ResourceT any, ValueT any](
 ) (ValueT, error) {
 	var zero ValueT
 
-	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := task.WrapTask[ResourceT, ValueT](tsk)
-
-	// Submit the task to the pool.
-	// If context is canceled before the task is published it will instead return an error.
-	if err := pool.Submit(ctx, valuelessTask); err != nil {
+	// select is not deterministic, and may still send tasks even if the context has been canceled.
+	if err := context.Cause(ctx); err != nil {
 		//nolint:wrapcheck
 		return zero, err
+	}
+
+	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
+	valuelessTask, taskResults := task.WrapTask[ResourceT, ValueT](ctx, tsk)
+
+	// Submit the task to the pool.
+	// If context is canceled before the task is published it should return an error.
+	select {
+	case <-ctx.Done():
+		//nolint:wrapcheck
+		return zero, context.Cause(ctx)
+	case pool.Requests() <- valuelessTask:
 	}
 
 	// Wait for the result or context cancellation, whichever comes first.
@@ -47,12 +72,15 @@ func Submit[ResourceT any, ValueT any](
 
 // SubmitMultiResultBuffered is a helper function to submit a [types.MultiResultTask] to a [types.Pool] and runs the
 // callback for each result as it is produced.
+// The same advisories as for [Submit] about context cancellation apply.
 //
 // # Callback
 //
 // If the callback produces an error, the task will be canceled and the error will be returned.
 // If the special error [safeconcurrencyerrors.Stop] is be returned from the callback the task context will be canceled,
 // the results channel drained, and the callback will not be called again.
+//
+// # Error Handling
 // As both the callback and the task may return an error, the errors will be joined and returned, therefore always
 // make sure to use [errors.Is] and [errors.As] to check for errors returned from this function.
 //
@@ -63,7 +91,8 @@ func Submit[ResourceT any, ValueT any](
 //
 // # Other
 //
-// If you need more control, use [task.WrapMultiResultTaskBuffered] and call [types.Pool.Submit] directly.
+// If you need more control, use [task.WrapMultiResultTaskBuffered] and publish to the [types.Pool.Requests] channel
+// directly.
 func SubmitMultiResultBuffered[ResourceT any, ValueT any](
 	ctx context.Context,
 	pool types.Pool[ResourceT],
@@ -71,30 +100,40 @@ func SubmitMultiResultBuffered[ResourceT any, ValueT any](
 	buffer uint,
 	callback types.TaskCallback[ValueT],
 ) error {
+	// select is not deterministic, and may still send tasks even if the context has been canceled.
+	if err := context.Cause(ctx); err != nil {
+		//nolint:wrapcheck
+		return err
+	}
+
+	// Ensure the context is canceled when the function returns, before the deference to drain.
+	ctx, cancel := context.WithCancelCause(ctx)
+	// The cancel func _must_ be called to ensure that a leak of contexts/goroutines does not occur.
+	defer cancel(context.Canceled)
+
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := task.WrapMultiResultTaskBuffered[ResourceT](tsk, buffer)
+	valuelessTask, taskResults := task.WrapMultiResultTaskBuffered[ResourceT](ctx, tsk, buffer)
+
+	// Submit the task to the pool.
+	// If context is canceled before the task is published it should return an error.
+	select {
+	case <-ctx.Done():
+		//nolint:wrapcheck
+		return context.Cause(ctx)
+	case pool.Requests() <- valuelessTask:
+	}
 
 	// Only drain the results channel if the task was submitted successfully.
 	// We should always have already drained the results channel below, but this is a
 	// precaution to avoid deadlocks in the case a panic occurs and recovered by the caller.
-	submitted := false
 	defer func() {
-		if submitted {
-			_ = taskResults.Drain()
-		}
+		// We already have a deference to cancel, however this should be done before the task results are drained.
+		// Remember that defered statements are executed in last-defered first-executed order (like a stack).
+		cancel(context.Canceled)
+		// We do not care about the error returned by Drain, if the error has not been returned it is because we are
+		// already panicking.
+		_ = taskResults.Drain()
 	}()
-
-	// Ensure the context is canceled when the function returns, before the deference to drain.
-	ctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(context.Canceled)
-
-	// Submit the task to the pool.
-	// If context is canceled before the task is published it will instead return an error.
-	if err := pool.Submit(ctx, valuelessTask); err != nil {
-		//nolint:wrapcheck
-		return err
-	}
-	submitted = true
 
 	// Call the callback for each result as it is produced.
 	callbackErr := callbackTaskResults(ctx, taskResults.Results(), callback)
@@ -156,19 +195,29 @@ func SubmitMultiResultCollectAll[ResourceT any, ValueT any](
 }
 
 // SubmitFunc is a helper function to submit a [types.TaskFunc] to a [types.Pool].
+// The same advisories as for [Submit] about context cancellation apply.
+//
+// # Error Handling
+// The error returned from the task is returned to the caller.
+//
+// # Other
+//
+// If you need more control, use [task.WrapTaskFunc] and publish to the [types.Pool.Requests] channel directly.
 func SubmitFunc[ResourceT any](
 	ctx context.Context,
 	pool types.Pool[ResourceT],
 	taskFunc types.TaskFunc[ResourceT],
 ) error {
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := task.WrapTaskFunc[ResourceT](taskFunc)
+	valuelessTask, taskResults := task.WrapTaskFunc[ResourceT](ctx, taskFunc)
 
 	// Submit the task to the pool.
-	// If context is canceled before the task is published it will instead return an error.
-	if err := pool.Submit(ctx, valuelessTask); err != nil {
+	// If context is canceled before the task is published it should return an error.
+	select {
+	case <-ctx.Done():
 		//nolint:wrapcheck
-		return err
+		return context.Cause(ctx)
+	case pool.Requests() <- valuelessTask:
 	}
 
 	// Wait for the result or context cancellation, whichever comes first.

@@ -11,7 +11,7 @@ import (
 type benchTask struct{}
 
 // Execute implements the [types.Task.Execute] interface.
-func (t *benchTask) Execute(ctx context.Context, _ interface{}) (struct{}, error) {
+func (t *benchTask) Execute(ctx context.Context, _ any) (struct{}, error) {
 	return struct{}{}, nil
 }
 
@@ -20,8 +20,8 @@ func (t *benchTask) Execute(ctx context.Context, _ interface{}) (struct{}, error
 // However, we are measuring both the time to submit tasks and to execute them (effectively the round-trip time).
 func BenchmarkSubmitRTT(b *testing.B) {
 	pool := NewPool[any](nil, 1)
+	defer pool.Close() // Ensure Close is called even if Start panics
 	pool.Start()
-	defer pool.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -44,7 +44,7 @@ func BenchmarkSubmitRTT(b *testing.B) {
 type wgDoneTask struct{}
 
 // Execute implements the [types.ValuelessTask.Execute] interface.
-func (*wgDoneTask) Execute(ctx context.Context, wg *sync.WaitGroup) {
+func (*wgDoneTask) Execute(wg *sync.WaitGroup) {
 	wg.Done()
 }
 
@@ -63,20 +63,14 @@ func BenchmarkPoolThroughput(b *testing.B) {
 	wg := &sync.WaitGroup{}
 	wg.Add(b.N)
 	pool := NewPoolBuffered[*sync.WaitGroup](wg, numCPU, 16*uint(numCPU))
+	defer pool.Close() // Ensure Close is called even if Start panics
 	pool.Start()
-	defer pool.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	task := &wgDoneTask{}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		err := pool.Submit(ctx, task)
-		if err != nil {
-			b.Fatal(err)
-		}
+		pool.Requests() <- task
 	}
 	wg.Wait()
 	// Stop timer before pool.Close() and context.CancelFunc() to avoid measuring cleanup time.
@@ -87,21 +81,15 @@ func BenchmarkPoolThroughput(b *testing.B) {
 func BenchmarkPoolThroughput1(b *testing.B) {
 	wg := &sync.WaitGroup{}
 	pool := NewPoolBuffered[*sync.WaitGroup](wg, 1, 16)
+	defer pool.Close() // Ensure Close is called even if Start panics
 	pool.Start()
-	defer pool.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	task := &wgDoneTask{}
 
 	wg.Add(b.N)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		err := pool.Submit(ctx, task)
-		if err != nil {
-			b.Fatal(err)
-		}
+		pool.Requests() <- task
 	}
 	wg.Wait()
 	// Stop timer before pool.Close() and context.CancelFunc() to avoid measuring cleanup time.

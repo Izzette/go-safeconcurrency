@@ -14,14 +14,9 @@ type Pool[ResourceT any] interface {
 	// It is safe to call .Close() multiple times.
 	Close()
 
-	// Submit submits a task to the Pool for execution.
-	// The provided context.Context is used passed to of the task when it is executed in the Pool.
-	// It is advisable to use context.WithDeadline or context.WithTimeout to limit the time the task is allowed to run
-	// and ensure the Pool can be shared with other tasks.
-	// Alternatively using context.WithCancel and deferring a call to the context.CancelFunc will stop the task from
-	// blocking the Pool if the caller is no longer interested in the result.
-	// ⚠️You must never attempt to submit tasks to a pool which has been closed, this will result in a panic!
-	Submit(context.Context, ValuelessTask[ResourceT]) error
+	// Requests returns the channel used to submit tasks to the pool.
+	// DO NOT close this channel, instead it should be closed by calling .Close().
+	Requests() chan<- ValuelessTask[ResourceT]
 }
 
 // Task is a simple task representing a unit of work that can be execution in a [Pool].
@@ -55,7 +50,7 @@ type MultiResultTask[ResourceT any, ValueT any] interface {
 // tasks.
 type ValuelessTask[ResourceT any] interface {
 	// Execute runs the task with the pool resource.
-	Execute(context.Context, ResourceT)
+	Execute(ResourceT)
 }
 
 // TaskFunc can be passed to [github.com/Izzette/go-safeconcurrency/workpool.SubmitFunc] to execute the function as a

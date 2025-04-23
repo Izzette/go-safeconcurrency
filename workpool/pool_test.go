@@ -1,8 +1,6 @@
 package workpool
 
 import (
-	"context"
-	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -13,7 +11,7 @@ type countingTask struct {
 	wg    *sync.WaitGroup
 }
 
-func (t *countingTask) Execute(ctx context.Context, res interface{}) {
+func (t *countingTask) Execute(res interface{}) {
 	defer t.wg.Done()
 	t.count.Add(1)
 }
@@ -21,8 +19,8 @@ func (t *countingTask) Execute(ctx context.Context, res interface{}) {
 func TestPoolConcurrency(t *testing.T) {
 	const concurrency = 3
 	p := NewPool[any](nil, concurrency)
-	p.Start()
 	defer p.Close()
+	p.Start()
 
 	var count atomic.Int32
 	wg := &sync.WaitGroup{}
@@ -31,9 +29,7 @@ func TestPoolConcurrency(t *testing.T) {
 	// Submit more tasks than concurrency
 	for i := 0; i < concurrency*2; i++ {
 		wg.Add(1)
-		if err := p.Submit(context.Background(), task); err != nil {
-			t.Fatalf("Failed to submit task: %v\n", err)
-		}
+		p.Requests() <- task
 	}
 
 	wg.Wait()
@@ -46,6 +42,7 @@ func TestPoolConcurrency(t *testing.T) {
 
 func TestPoolSubmitAfterClose(t *testing.T) {
 	p := NewPool[any](nil, 1)
+	defer p.Close() // Ensure Close is called even if Start panics
 	p.Start()
 	p.Close()
 
@@ -54,21 +51,5 @@ func TestPoolSubmitAfterClose(t *testing.T) {
 			t.Error("Expected panic when submitting to closed pool")
 		}
 	}()
-	if err := p.Submit(context.Background(), &countingTask{}); err != nil {
-		t.Errorf("Expected panic, got error: %v", err)
-	}
-}
-
-func TestPoolContextCancel(t *testing.T) {
-	p := NewPoolBuffered[any](nil, 1, 0)
-	p.Start()
-	defer p.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	err := p.Submit(ctx, &countingTask{})
-	if !errors.Is(err, context.Canceled) {
-		t.Errorf("Expected context canceled error, got %v", err)
-	}
+	p.Requests() <- &countingTask{}
 }

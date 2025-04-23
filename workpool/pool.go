@@ -1,7 +1,6 @@
 package workpool
 
 import (
-	"context"
 	"sync"
 	"sync/atomic"
 
@@ -27,7 +26,7 @@ func NewPoolBuffered[ResourceT any](resource ResourceT, concurrency int, buffer 
 
 	pool := &pool[ResourceT]{
 		resource:    resource,
-		requests:    make(chan contextualTask[ResourceT], buffer),
+		requests:    make(chan types.ValuelessTask[ResourceT], buffer),
 		concurrency: uint(concurrency),
 		wg:          &sync.WaitGroup{},
 		started:     &atomic.Bool{},
@@ -40,16 +39,10 @@ func NewPoolBuffered[ResourceT any](resource ResourceT, concurrency int, buffer 
 	return pool
 }
 
-// contextualTask is a wrapper for [types.ValuelessTask] that adds a [context.Context] to the task.
-type contextualTask[ResourceT any] struct {
-	types.ValuelessTask[ResourceT]
-	getContext func() context.Context
-}
-
 // pool implements [types.Pool].
 type pool[ResourceT any] struct {
 	resource    ResourceT
-	requests    chan contextualTask[ResourceT]
+	requests    chan types.ValuelessTask[ResourceT]
 	concurrency uint
 	wg          *sync.WaitGroup
 	started     *atomic.Bool
@@ -61,7 +54,7 @@ type pool[ResourceT any] struct {
 func (p *pool[ResourceT]) Start() {
 	// Check if the pool has already been started.
 	if p.started.Swap(true) {
-		panic("attempt to start previously started pool.Pool")
+		panic("attempt to start previously started worker pool")
 	}
 
 	// The WaitGroup is already populated for the number of workers.
@@ -79,27 +72,10 @@ func (p *pool[ResourceT]) Close() {
 	p.wg.Wait()
 }
 
-// Submit implements [types.Pool.Submit].
-func (p *pool[ResourceT]) Submit(ctx context.Context, task types.ValuelessTask[ResourceT]) error {
-	// select is not deterministic, and may still send tasks even if the context has been canceled.
-	if err := context.Cause(ctx); err != nil {
-		//nolint:wrapcheck
-		return err
-	}
-
-	ctxTask := contextualTask[ResourceT]{
-		ValuelessTask: task,
-		getContext:    func() context.Context { return ctx },
-	}
-
-	// Submit the task to the requests channel.
-	select {
-	case <-ctx.Done():
-		//nolint:wrapcheck
-		return context.Cause(ctx)
-	case p.requests <- ctxTask:
-		return nil
-	}
+// Requests implements [types.Pool.Requests].
+// ⚠️ DO NOT close this channel, instead it should be closed by [pool.Close].
+func (p *pool[ResourceT]) Requests() chan<- types.ValuelessTask[ResourceT] {
+	return p.requests
 }
 
 // worker is a goroutine that executes tasks from the requests channel.
@@ -107,7 +83,7 @@ func (p *pool[ResourceT]) worker() {
 	defer p.wg.Done()
 
 	for task := range p.requests {
-		task.Execute(task.getContext(), p.resource)
+		task.Execute(p.resource)
 	}
 }
 

@@ -19,12 +19,13 @@ func (t *mockMultiResultTask) Execute(ctx context.Context, res interface{}, h ty
 }
 
 func TestWrapMultiResultTask(t *testing.T) {
-	bareTask, taskResult := WrapMultiResultTaskBuffered[interface{}, string](&mockMultiResultTask{t}, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	bareTask, taskResult := WrapMultiResultTaskBuffered[interface{}, string](ctx, &mockMultiResultTask{t}, 1)
+
 	// Execute task synchronously
-	bareTask.Execute(ctx, nil)
+	bareTask.Execute(nil)
 
 	results := make([]string, 0, 1)
 	for val := range taskResult.Results() {
@@ -50,15 +51,16 @@ func (t *mockTask) Execute(ctx context.Context, res interface{}) (int, error) {
 }
 
 func TestWrapTask(t *testing.T) {
-	bareTask, taskResult := WrapTask[interface{}, int](&mockTask{val: 42})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	bareTask, taskResult := WrapTask[interface{}, int](ctx, &mockTask{val: 42})
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		bareTask.Execute(ctx, nil)
+		bareTask.Execute(nil)
 	}()
 
 	val, ok := <-taskResult.Results()
@@ -75,17 +77,18 @@ func TestWrapTask(t *testing.T) {
 }
 
 func TestWrapTaskFunc(t *testing.T) {
-	bareTask, taskResult := WrapTaskFunc[interface{}](func(ctx context.Context, res interface{}) error {
-		return nil
-	})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	bareTask, taskResult := WrapTaskFunc[interface{}](ctx, func(ctx context.Context, res interface{}) error {
+		return nil
+	})
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		bareTask.Execute(ctx, nil)
+		bareTask.Execute(nil)
 	}()
 
 	val, ok := <-taskResult.Results()

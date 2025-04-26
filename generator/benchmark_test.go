@@ -27,7 +27,7 @@ func (r *benchProducer) Run(ctx context.Context, h types.Emitter[struct{}]) erro
 // BenchmarkGenerator measures the performance of generating and consuming values using a buffer size of 1.
 func BenchmarkGenerator(b *testing.B) {
 	producer := &benchProducer{n: b.N}
-	gen := NewGeneratorBuffered[struct{}](producer, 1)
+	gen := NewBuffered[struct{}](producer, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

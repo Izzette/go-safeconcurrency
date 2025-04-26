@@ -49,7 +49,7 @@ Expect new features and improvements in future releases, generators and work poo
 
    Create and manage concurrent execution:
    ```go
-   gen := generator.NewGenerator[Output](&MyProducer{})
+   gen := generator.New[Output](&MyProducer{})
    gen.Start(ctx)
    ```
 

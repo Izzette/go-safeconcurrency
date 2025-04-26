@@ -8,17 +8,17 @@ import (
 	"github.com/Izzette/go-safeconcurrency/results"
 )
 
-// NewGenerator creates (but does not start) a basic implementation of [types.Generator] with no results buffering.
-// If you would like results buffering, use [NewGeneratorBuffered] instead.
-// This is equivalent to calling [NewGeneratorBuffered] with a buffer size of 0.
-func NewGenerator[T any](producer types.Producer[T]) types.Generator[T] {
-	return NewGeneratorBuffered(producer, 0)
+// New creates (but does not start) a basic implementation of [types.Generator] with no results buffering.
+// If you would like results buffering, use [NewBuffered] instead.
+// This is equivalent to calling [NewBuffered] with a buffer size of 0.
+func New[T any](producer types.Producer[T]) types.Generator[T] {
+	return NewBuffered(producer, 0)
 }
 
-// NewGeneratorBuffered creates (but does not start) a basic implementation of [types.Generator] with the specified
+// NewBuffered creates (but does not start) a basic implementation of [types.Generator] with the specified
 // results buffer size.
 // It is not re-startable, and thus [types.Generator.Start] or [types.Generator.Run] must only be called exactly once.
-func NewGeneratorBuffered[T any](producer types.Producer[T], buffer uint) types.Generator[T] {
+func NewBuffered[T any](producer types.Producer[T], buffer uint) types.Generator[T] {
 	return &generator[T]{
 		producer: producer,
 		results:  make(chan T, buffer),

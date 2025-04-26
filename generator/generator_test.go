@@ -27,7 +27,7 @@ func (r *testProducer) Run(ctx context.Context, h types.Emitter[int]) error {
 func TestGeneratorSendsAllValues(t *testing.T) {
 	expectedValues := []int{1, 2, 3}
 	producer := &testProducer{values: expectedValues}
-	gen := NewGeneratorBuffered[int](producer, uint(len(expectedValues)))
+	gen := NewBuffered[int](producer, uint(len(expectedValues)))
 	ctx := context.Background()
 
 	go gen.Start(ctx)
@@ -49,7 +49,7 @@ func TestGeneratorSendsAllValues(t *testing.T) {
 func TestGeneratorContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	producer := &testProducer{values: []int{1, 2, 3, 4, 5}}
-	gen := NewGenerator[int](producer)
+	gen := New[int](producer)
 
 	go gen.Start(ctx)
 	cancel()
@@ -72,7 +72,7 @@ func TestGeneratorContextCancellation(t *testing.T) {
 func TestGeneratorFatalError(t *testing.T) {
 	expectedErr := errors.New("fatal error")
 	producer := &testProducer{err: expectedErr}
-	gen := NewGenerator[int](producer)
+	gen := New[int](producer)
 	ctx := context.Background()
 
 	go gen.Start(ctx)
@@ -84,7 +84,7 @@ func TestGeneratorFatalError(t *testing.T) {
 }
 
 func TestGeneratorStartPanicsWhenCalledTwice(t *testing.T) {
-	gen := NewGenerator[int](&testProducer{})
+	gen := New[int](&testProducer{})
 	ctx := context.Background()
 	gen.Start(ctx)
 
@@ -116,7 +116,7 @@ func (r *testProducerDone) Run(ctx context.Context, h types.Emitter[int]) error 
 func TestBufferedGenerator(t *testing.T) {
 	values := []int{1, 2, 3}
 	producer := &testProducerDone{values: values, done: make(chan struct{})}
-	gen := NewGeneratorBuffered[int](producer, uint(len(values)))
+	gen := NewBuffered[int](producer, uint(len(values)))
 	ctx := context.Background()
 
 	go gen.Start(ctx)

@@ -11,15 +11,11 @@ Demonstrates creating a generator that produces a sequence of integers.
 
 _Here's an abridged version of the example_:
 ```go
-// Example_generator shows generator usage
-func Example_generator() {
-    w := generator.NewGeneratorBuffered[int](&IteratorJob{EndExclusive: 10}, 1)
-    ctx, _ := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
-    w.Start(ctx)
+w := generator.NewBuffered[int](&IteratorJob{EndExclusive: 10}, 1)
+w.Start(ctx)
 
-    for value := range w.Results() {
-        fmt.Println(value)
-    }
+for value := range w.Results() {
+    fmt.Println(value)
 }
 ```
 

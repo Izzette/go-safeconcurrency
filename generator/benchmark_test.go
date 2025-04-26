@@ -7,16 +7,16 @@ import (
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
-// benchRunner is a simple implementation of the [types.Runner] interface.
-type benchRunner struct {
+// benchProducer is a simple implementation of the [types.Producer] interface.
+type benchProducer struct {
 	n int
 }
 
-// Run implements the [types.Runner.Run] method.
-func (r *benchRunner) Run(ctx context.Context, h types.Handle[struct{}]) error {
+// Run implements the [types.Producer.Run] method.
+func (r *benchProducer) Run(ctx context.Context, h types.Emitter[struct{}]) error {
 	s := struct{}{}
 	for i := 0; i < r.n; i++ {
-		if err := h.Publish(ctx, s); err != nil {
+		if err := h.Emit(ctx, s); err != nil {
 			return err
 		}
 	}
@@ -26,8 +26,8 @@ func (r *benchRunner) Run(ctx context.Context, h types.Handle[struct{}]) error {
 
 // BenchmarkGenerator measures the performance of generating and consuming values using a buffer size of 1.
 func BenchmarkGenerator(b *testing.B) {
-	runner := &benchRunner{n: b.N}
-	gen := NewGeneratorBuffered[struct{}](runner, 1)
+	producer := &benchProducer{n: b.N}
+	gen := NewGeneratorBuffered[struct{}](producer, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

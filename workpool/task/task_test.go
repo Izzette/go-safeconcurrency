@@ -8,21 +8,21 @@ import (
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
-type mockMultiResultTask struct{ t *testing.T }
+type mockStreamingTask struct{ t *testing.T }
 
-func (t *mockMultiResultTask) Execute(ctx context.Context, res interface{}, h types.Handle[string]) error {
-	if err := h.Publish(ctx, "test"); err != nil {
+func (t *mockStreamingTask) Execute(ctx context.Context, res interface{}, h types.Emitter[string]) error {
+	if err := h.Emit(ctx, "test"); err != nil {
 		t.t.Errorf("Failed to publish result: %v", err)
 	}
 
 	return nil
 }
 
-func TestWrapMultiResultTask(t *testing.T) {
+func TestWrapStreamingTask(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bareTask, taskResult := WrapMultiResultTaskBuffered[interface{}, string](ctx, &mockMultiResultTask{t}, 1)
+	bareTask, taskResult := WrapStreamingTask[interface{}, string](ctx, &mockStreamingTask{t}, 1)
 
 	// Execute task synchronously
 	bareTask.Execute(nil)

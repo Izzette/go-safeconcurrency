@@ -18,7 +18,7 @@ func (t *countingTask) Execute(res interface{}) {
 
 func TestPoolConcurrency(t *testing.T) {
 	const concurrency = 3
-	p := NewPool[any](nil, concurrency)
+	p := New[any](nil, concurrency)
 	defer p.Close()
 	p.Start()
 
@@ -41,7 +41,7 @@ func TestPoolConcurrency(t *testing.T) {
 }
 
 func TestPoolSubmitAfterClose(t *testing.T) {
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	defer p.Close() // Ensure Close is called even if Start panics
 	p.Start()
 	p.Close()

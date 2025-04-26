@@ -19,7 +19,7 @@ func (t *benchTask) Execute(ctx context.Context, _ any) (struct{}, error) {
 // There is no backlog of tasks, so the performance of the worker pool is hindered in terms of maximum throughput.
 // However, we are measuring both the time to submit tasks and to execute them (effectively the round-trip time).
 func BenchmarkSubmitRTT(b *testing.B) {
-	pool := NewPool[any](nil, 1)
+	pool := New[any](nil, 1)
 	defer pool.Close() // Ensure Close is called even if Start panics
 	pool.Start()
 
@@ -49,8 +49,8 @@ func (*wgDoneTask) Execute(wg *sync.WaitGroup) {
 }
 
 // BenchmarkPoolThroughput measures the maximum throughput of the worker pool using all available cores.
-// It calls [types.Pool.Submit] directly with a [typse.ValuelessTask], rather than using the [Submit] family of helper
-// functions for maximum throughput.
+// It calls [types.WorkerPool.Submit] directly with a [typse.ValuelessTask], rather than using the [Submit] family of
+// helper functions for maximum throughput.
 // It runs using a work pool of concurrency workers equal to the number of CPUs available and waits for their completion
 // using a [*sync.WaitGroup].
 // This can actually be slower when 1 CPU is used, as the overhead of locking and conditions for the underlying requests
@@ -62,7 +62,7 @@ func BenchmarkPoolThroughput(b *testing.B) {
 	numCPU := runtime.NumCPU()
 	wg := &sync.WaitGroup{}
 	wg.Add(b.N)
-	pool := NewPoolBuffered[*sync.WaitGroup](wg, numCPU, 16*uint(numCPU))
+	pool := NewBuffered[*sync.WaitGroup](wg, numCPU, 16*uint(numCPU))
 	defer pool.Close() // Ensure Close is called even if Start panics
 	pool.Start()
 
@@ -80,7 +80,7 @@ func BenchmarkPoolThroughput(b *testing.B) {
 // BenchmarkPoolThroughput1 is a variant of [BenchmarkPoolThroughput] that uses a single worker.
 func BenchmarkPoolThroughput1(b *testing.B) {
 	wg := &sync.WaitGroup{}
-	pool := NewPoolBuffered[*sync.WaitGroup](wg, 1, 16)
+	pool := NewBuffered[*sync.WaitGroup](wg, 1, 16)
 	defer pool.Close() // Ensure Close is called even if Start panics
 	pool.Start()
 

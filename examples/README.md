@@ -36,16 +36,14 @@ Shows basic worker pool usage with a shared resource.
 
 _Here's an abridged version of the example_:
 ```go
-func Example_easyPool() {
-    p := workpool.NewPool[int](42, 1)
-    defer p.Close()
-    p.Start()
+p := workpool.New[int](42, 1)
+defer p.Close()
+p.Start()
 
-    workpool.SubmitFunc[int](context.Background(), p, func(_ context.Context, n int) error {
-        fmt.Printf("value: %d\n", n)
-        return nil
-    })
-}
+workpool.SubmitFunc[int](context.Background(), p, func(_ context.Context, n int) error {
+    fmt.Printf("value: %d\n", n)
+    return nil
+})
 ```
 
 Run with:
@@ -81,10 +79,21 @@ Demonstrates a pool handling multiple task types with different result patterns.
 
 _Here's an abridged version of the example_:
 ```go
-// Submit different task types
-workpool.Submit[any, int](ctx, pool, &IntTask{42})       // Single-result task
-workpool.SubmitMultiResult[any, string](ctx, pool, task) // Multi-result task
-workpool.SubmitFunc[any](ctx, pool, func() error { ... }) // Function task
+result, err := workpool.Submit[any, int](ctx, pool, &IntTask{42}) // Single-result task
+
+// Submit a streaming task
+err = workpool.SubmitStreaming[any, string](ctx, pool, task, func(ctx context.Context, result string) error {
+    // Runs callback for each result
+    fmt.Println(result)
+    return nil
+})
+
+// Submit a function task
+err = workpool.SubmitFunc[any](ctx, pool, func(ctx context.Context) error {
+    // Runs in the worker pool
+    fmt.Println("Function task executed")
+    return nil
+})
 ```
 
 Run with:

@@ -18,17 +18,17 @@ func (t *IntTask) Execute(ctx context.Context, _ any) (int, error) {
 	return t.Value, nil
 }
 
-// StringTask implements [types.MultiResultTask].
-// It publishes two strings to the provided handle.
+// StringTask implements [types.StreamingTask].
+// It emits two strings to the provided emitter.
 type StringTask struct {
 	Strings []string
 }
 
-// Execute implements [types.MultiResultTask.Execute].
-func (t *StringTask) Execute(ctx context.Context, _ any, h types.Handle[string]) error {
+// Execute implements [types.StreamingTask.Execute].
+func (t *StringTask) Execute(ctx context.Context, _ any, h types.Emitter[string]) error {
 	for _, s := range t.Strings {
-		if err := h.Publish(ctx, s); err != nil {
-			// The context is canceled, we should stop publishing results.
+		if err := h.Emit(ctx, s); err != nil {
+			// The context is canceled, we should stop emitting results.
 			return err
 		}
 	}

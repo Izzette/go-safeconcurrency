@@ -8,6 +8,8 @@ import "context"
 // the results channel is drained.
 // This can lead to a deadlock if all results are not completely consumed before calling [types.Generator.Wait], and no
 // mechanism to drain the results channel from another goroutine is in place.
+//
+// To create generators and for more details, see [github.com/Izzette/go-safeconcurrency/generator.NewBuffered].
 type Generator[T any] interface {
 	// Start launches a goroutine to produce the results.
 	Start(context.Context)

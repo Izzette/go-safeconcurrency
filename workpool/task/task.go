@@ -7,17 +7,17 @@ import (
 	"github.com/Izzette/go-safeconcurrency/results"
 )
 
-// WrapTask wraps a [types.Task] so that it can be executed in a [types.Pool] and returns a channel for
+// Wrap wraps a [types.Task] so that it can be executed in a [types.WorkerPool] and returns a channel for
 // results.
 // This channel has a buffer size of 1 and will not block the worker when publishing the result.
 // The results channel is always written to, even if the task returns an error.
-// The provided context is passed to the task when it is executed in the [types.Pool].
+// The provided context is passed to the task when it is executed in the [types.WorkerPool].
 //
 // It is recommended not to use this wrapper directly, but rather use the [workpool.Submit] helper function.
 // The [workpool.Submit] helper will wrap the [types.Task], submit it to the pool, and wait for the result.
 // The [workpool.Submit] helper implements error handling correctly and is less error prone than using this wrapper and
-// sending to the [types.Pool.Requests] channel directly.
-func WrapTask[ResourceT any, ValueT any](
+// sending to the [types.WorkerPool.Requests] channel directly.
+func Wrap[ResourceT any, ValueT any](
 	ctx context.Context,
 	task types.Task[ResourceT, ValueT],
 ) (types.ValuelessTask[ResourceT], types.TaskResult[ValueT]) {
@@ -38,58 +38,50 @@ func WrapTask[ResourceT any, ValueT any](
 	return wrappedTask, taskResult
 }
 
-// WrapMultiResultTaskBuffered wraps a [types.MultiResultTask] so that it can be executed in a [types.Pool] and returns
+// WrapStreaming wraps a [types.StreamingTask] so that it can be executed in a [types.WorkerPool] and returns
 // a channel for results.
 // The buffer size of the results channel is specified by the buffer parameter.
 // It is recommended avoid using a buffer size of 0, as this will block the worker until the result is received.
 //
-// It is recommended not to use this wrapper directly, but rather use the [workpool.SubmitMultiResultBuffered] helper
-// function.
-// The [workpool.SubmitMultiResultBuffered] helper will wrap the [types.MultiResultTask], submit it to the pool, and
-// call the callback for each result as it is produced.
-// The [workpool.SubmitMultiResultBuffered] helper implements error handling correctly and is less error prone than
-// using this wrapper and sending to the [types.Pool.Requests] channel directly.
-func WrapMultiResultTaskBuffered[ResourceT any, ValueT any](
+// It is recommended not to use this wrapper directly, but rather use the
+// [github.com/Izzette/go-safeconcurrency/workpool.SubmitStreamingBuffered] helper function.
+// This helper will wrap the [types.StreamingTask], send it to the pool requests channel, and call the callback for each
+// result as it is produced.
+// This helper implements error handling correctly and is less error prone than using this wrapper and sending to the
+// [types.WorkerPool.Requests] channel directly.
+func WrapStreaming[ResourceT any, ValueT any](
 	ctx context.Context,
-	task types.MultiResultTask[ResourceT, ValueT],
+	task types.StreamingTask[ResourceT, ValueT],
 	buffer uint,
 ) (types.ValuelessTask[ResourceT], types.TaskResult[ValueT]) {
 	res := make(chan ValueT, buffer)
-	handle := results.NewHandle(res)
+	emitter := results.NewEmitter(res)
 	var err error
 	taskResult := &taskResult[ValueT]{
 		results: res,
 		err:     &err,
 	}
-	wrappedTask := multiResultTaskWrapper[ResourceT, ValueT]{
-		ctx:    ctx,
-		task:   task,
-		handle: handle,
-		err:    &err,
+	wrappedTask := streamingTaskWrapper[ResourceT, ValueT]{
+		ctx:     ctx,
+		task:    task,
+		emitter: emitter,
+		err:     &err,
 	}
 
 	return wrappedTask, taskResult
 }
 
-// WrapMultiResultTask wraps a [types.MultiResultTask] with a buffer size of 1.
-// This is equivalent to calling [workpool.WrapMultiResultTaskBuffered] with a buffer size of 1.
-func WrapMultiResultTask[ResourceT any, ValueT any](
-	ctx context.Context,
-	task types.MultiResultTask[ResourceT, ValueT],
-) (types.ValuelessTask[ResourceT], types.TaskResult[ValueT]) {
-	return WrapMultiResultTaskBuffered(ctx, task, 1)
-}
-
-// WrapTaskFunc wraps a [types.TaskFunc] so that it can be executed in a [types.Pool] and returns a [types.TaskResult]
-// for execution monitoring and error propagation.
-// It is not recommended to use this wrapper directly, but rather use the [workpool.SubmitFunc] helper function.
-// The [workpool.SubmitFunc] helper will wrap the [types.TaskFunc], submit it to the pool, and wait for the result.
+// WrapFunc wraps a [types.TaskFunc] so that it can be executed in a [types.WorkerPool] and returns a
+// [types.TaskResult] for execution monitoring and error propagation.
+// It is not recommended to use this wrapper directly, but rather use the
+// [github.com/Izzette/go-safeconcurrency/workpool.SubmitFunc] helper function.
+// This [workpool.SubmitFunc] helper will wrap the [types.TaskFunc], submit it to the pool, and wait for the result.
 // The [workpool.SubmitFunc] helper implements error handling correctly and is less error prone than using this wrapper
-// and sending to the [types.Pool.Requests] channel directly.
-func WrapTaskFunc[ResourceT any](ctx context.Context, f types.TaskFunc[ResourceT]) (
+// and sending to the [types.WorkerPool.Requests] channel directly.
+func WrapFunc[ResourceT any](ctx context.Context, f types.TaskFunc[ResourceT]) (
 	types.ValuelessTask[ResourceT], types.TaskResult[struct{}],
 ) {
-	return WrapTask[ResourceT, struct{}](ctx, taskFuncWrapper[ResourceT]{f})
+	return Wrap[ResourceT, struct{}](ctx, taskFuncWrapper[ResourceT]{f})
 }
 
 // taskResult implements [types.TaskResult].
@@ -114,20 +106,20 @@ func (tr *taskResult[ValueT]) Drain() error {
 	return *tr.err
 }
 
-// multiResultTaskWrapper is a wrapper for a [types.MultiResultTask] implementing [types.ValuelessTask].
-type multiResultTaskWrapper[ResourceT any, ValueT any] struct {
+// streamingTaskWrapper is a wrapper for a [types.StreamingTask] implementing [types.ValuelessTask].
+type streamingTaskWrapper[ResourceT any, ValueT any] struct {
 	//nolint:containedctx
-	ctx    context.Context
-	task   types.MultiResultTask[ResourceT, ValueT]
-	handle types.Handle[ValueT]
-	err    *error
+	ctx     context.Context
+	task    types.StreamingTask[ResourceT, ValueT]
+	emitter types.Emitter[ValueT]
+	err     *error
 }
 
-// Execute implements [types.MultiResultTask.Execute].
-func (t multiResultTaskWrapper[ResourceT, ValueT]) Execute(resource ResourceT) {
-	defer t.handle.Close()
+// Execute implements [types.StreamingTask.Execute].
+func (t streamingTaskWrapper[ResourceT, ValueT]) Execute(resource ResourceT) {
+	defer t.emitter.Close()
 	// We must not overwrite the error pointer, but instead store the error at the address of the pointer.
-	*t.err = t.task.Execute(t.ctx, resource, t.handle)
+	*t.err = t.task.Execute(t.ctx, resource, t.emitter)
 }
 
 // taskWrapper is a wrapper for a [types.Task] implementing [types.ValuelessTask].
@@ -144,7 +136,7 @@ func (t taskWrapper[ResourceT, ValueT]) Execute(
 	resource ResourceT,
 ) {
 	defer close(t.r)
-	// taskWithHandleWrapper will close the handle for us when the task is done.
+	// streamingTaskWrapper will close the emitter for us when the task is done.
 	value, err := t.task.Execute(t.ctx, resource)
 	// We must not overwrite the error pointer, but instead store the error at the address of the pointer.
 	*t.err = err

@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-func TestHandlePublishSendsResult(t *testing.T) {
+func TestEmitSendsResult(t *testing.T) {
 	resultsChan := make(chan int, 1)
-	h := NewHandle[int](resultsChan)
+	h := NewEmitter[int](resultsChan)
 
 	ctx := context.Background()
 	value := 42
-	err := h.Publish(ctx, value)
+	err := h.Emit(ctx, value)
 	if err != nil {
-		t.Fatalf("Publish returned error: %v", err)
+		t.Fatalf("emit returned error: %v", err)
 	}
 
 	select {
@@ -27,22 +27,22 @@ func TestHandlePublishSendsResult(t *testing.T) {
 	}
 }
 
-func TestHandlePublishAfterContextCancel(t *testing.T) {
+func TestEmitAfterContextCancel(t *testing.T) {
 	resultsChan := make(chan int, 1)
-	h := NewHandle[int](resultsChan)
+	h := NewEmitter[int](resultsChan)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := h.Publish(ctx, 1)
+	err := h.Emit(ctx, 1)
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got %v", err)
 	}
 }
 
-func TestHandleCloseClosesChannel(t *testing.T) {
+func TestEmitCloseClosesChannel(t *testing.T) {
 	resultsChan := make(chan int)
-	h := NewHandle[int](resultsChan)
+	h := NewEmitter[int](resultsChan)
 	h.Close()
 
 	_, ok := <-resultsChan

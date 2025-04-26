@@ -9,14 +9,14 @@ import (
 	"github.com/Izzette/go-safeconcurrency/api/types"
 )
 
-type testRunner struct {
+type testProducer struct {
 	values []int
 	err    error
 }
 
-func (r *testRunner) Run(ctx context.Context, h types.Handle[int]) error {
+func (r *testProducer) Run(ctx context.Context, h types.Emitter[int]) error {
 	for _, v := range r.values {
-		if err := h.Publish(ctx, v); err != nil {
+		if err := h.Emit(ctx, v); err != nil {
 			return err
 		}
 	}
@@ -26,8 +26,8 @@ func (r *testRunner) Run(ctx context.Context, h types.Handle[int]) error {
 
 func TestGeneratorSendsAllValues(t *testing.T) {
 	expectedValues := []int{1, 2, 3}
-	runner := &testRunner{values: expectedValues}
-	gen := NewGeneratorBuffered[int](runner, uint(len(expectedValues)))
+	producer := &testProducer{values: expectedValues}
+	gen := NewBuffered[int](producer, uint(len(expectedValues)))
 	ctx := context.Background()
 
 	go gen.Start(ctx)
@@ -48,8 +48,8 @@ func TestGeneratorSendsAllValues(t *testing.T) {
 
 func TestGeneratorContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := &testRunner{values: []int{1, 2, 3, 4, 5}}
-	gen := NewGenerator[int](runner)
+	producer := &testProducer{values: []int{1, 2, 3, 4, 5}}
+	gen := New[int](producer)
 
 	go gen.Start(ctx)
 	cancel()
@@ -71,8 +71,8 @@ func TestGeneratorContextCancellation(t *testing.T) {
 
 func TestGeneratorFatalError(t *testing.T) {
 	expectedErr := errors.New("fatal error")
-	runner := &testRunner{err: expectedErr}
-	gen := NewGenerator[int](runner)
+	producer := &testProducer{err: expectedErr}
+	gen := New[int](producer)
 	ctx := context.Background()
 
 	go gen.Start(ctx)
@@ -84,7 +84,7 @@ func TestGeneratorFatalError(t *testing.T) {
 }
 
 func TestGeneratorStartPanicsWhenCalledTwice(t *testing.T) {
-	gen := NewGenerator[int](&testRunner{})
+	gen := New[int](&testProducer{})
 	ctx := context.Background()
 	gen.Start(ctx)
 
@@ -96,16 +96,16 @@ func TestGeneratorStartPanicsWhenCalledTwice(t *testing.T) {
 	gen.Start(ctx)
 }
 
-type testRunnerDone struct {
+type testProducerDone struct {
 	values []int
 	err    error
 	done   chan struct{}
 }
 
-func (r *testRunnerDone) Run(ctx context.Context, h types.Handle[int]) error {
+func (r *testProducerDone) Run(ctx context.Context, h types.Emitter[int]) error {
 	defer close(r.done)
 	for _, v := range r.values {
-		if err := h.Publish(ctx, v); err != nil {
+		if err := h.Emit(ctx, v); err != nil {
 			return err
 		}
 	}
@@ -115,14 +115,14 @@ func (r *testRunnerDone) Run(ctx context.Context, h types.Handle[int]) error {
 
 func TestBufferedGenerator(t *testing.T) {
 	values := []int{1, 2, 3}
-	runner := &testRunnerDone{values: values, done: make(chan struct{})}
-	gen := NewGeneratorBuffered[int](runner, uint(len(values)))
+	producer := &testProducerDone{values: values, done: make(chan struct{})}
+	gen := NewBuffered[int](producer, uint(len(values)))
 	ctx := context.Background()
 
 	go gen.Start(ctx)
 
 	// Wait for the generator to finish sending results
-	<-runner.done
+	<-producer.done
 
 	if len(gen.Results()) != len(values) {
 		t.Errorf("expected %d buffered results, got %d", len(values), len(gen.Results()))

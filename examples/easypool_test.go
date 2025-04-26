@@ -7,12 +7,12 @@ import (
 	"github.com/Izzette/go-safeconcurrency/workpool"
 )
 
-// Simple example of how [workpool.NewPool] can be used to create a [types.Pool] worker pool that executes tasks
+// Simple example of how [workpool.New] can be used to create a [types.WorkerPool] worker pool that executes tasks
 // concurrently.
 // Here we're submitting a function to execute in the pool with [workpool.SubmitFunc].
 func Example_easyPool() {
 	poolResource := 42
-	p := workpool.NewPool[int](poolResource, 1)
+	p := workpool.New[int](poolResource, 1)
 	defer p.Close()
 	p.Start()
 

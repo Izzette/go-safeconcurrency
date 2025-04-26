@@ -8,6 +8,8 @@ import "context"
 // the results channel is drained.
 // This can lead to a deadlock if all results are not completely consumed before calling [types.Generator.Wait], and no
 // mechanism to drain the results channel from another goroutine is in place.
+//
+// To create generators and for more details, see [github.com/Izzette/go-safeconcurrency/generator.NewBuffered].
 type Generator[T any] interface {
 	// Start launches a goroutine to produce the results.
 	Start(context.Context)
@@ -24,11 +26,11 @@ type Generator[T any] interface {
 	Results() <-chan T
 }
 
-// Runner represents a piece of runnable code.
+// Producer represents a piece of runnable code.
 // It is used by [Generator] to produce results.
-type Runner[T any] interface {
-	// Run should start the Runner and block until all work is completed, optionally returning a error.
-	// The same context passed to Run() should be passed to Handle.Publish().
-	// Run MUST cleanup and return as soon as possible after a call to Handle.Publish() returns a cancellation error.
-	Run(context.Context, Handle[T]) error
+type Producer[T any] interface {
+	// Run should start the producer and block until all work is completed, optionally returning a error.
+	// The same context passed to Run() should be passed to Emitter.Emit().
+	// Run MUST cleanup and return as soon as possible after a call to Emitter.Emit() returns a cancellation error.
+	Run(context.Context, Emitter[T]) error
 }

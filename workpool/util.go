@@ -10,16 +10,16 @@ import (
 	"github.com/Izzette/go-safeconcurrency/workpool/task"
 )
 
-// Submit is a helper function to submit a [types.Task] to a [types.Pool] and wait for the result.
+// Submit is a helper function to submit a [types.Task] to a [types.WorkerPool] and wait for the result.
 // The result and error returned from the task are returned to the caller.
 //
 // # Context
 //
-// The provided [context.Context] is passed to the task when it is executed in the [types.Pool].
+// The provided [context.Context] is passed to the task when it is executed in the [types.WorkerPool].
 // It is advisable to use [context.WithDeadline] or [context.WithTimeout] to limit the time the task is allowed to run
-// and ensure the Pool can be shared with other tasks.
+// and ensure the [types.WorkerPool] can be shared with other tasks.
 // Alternatively, using [context.WithCancel] and deferring a call to the context.CancelFunc will stop the task from
-// blocking the Pool if the caller is no longer interested in the result.
+// blocking the [types.WorkerPool] if the caller is no longer interested in the result.
 //
 // # Warning
 //
@@ -27,10 +27,10 @@ import (
 //
 // # Other
 //
-// If you need more control, use [task.WrapTaskBuffered] and publish to the [types.Pool.Requests] channel directly.
+// If you need more control, use [task.WrapBuffered] and send to the [types.WorkerPool.Requests] channel directly.
 func Submit[ResourceT any, ValueT any](
 	ctx context.Context,
-	pool types.Pool[ResourceT],
+	pool types.WorkerPool[ResourceT],
 	tsk types.Task[ResourceT, ValueT],
 ) (ValueT, error) {
 	var zero ValueT
@@ -42,10 +42,10 @@ func Submit[ResourceT any, ValueT any](
 	}
 
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := task.WrapTask[ResourceT, ValueT](ctx, tsk)
+	valuelessTask, taskResults := task.Wrap[ResourceT, ValueT](ctx, tsk)
 
 	// Submit the task to the pool.
-	// If context is canceled before the task is published it should return an error.
+	// If context is canceled before the task is sent it should return an error.
 	select {
 	case <-ctx.Done():
 		//nolint:wrapcheck
@@ -70,35 +70,34 @@ func Submit[ResourceT any, ValueT any](
 	}
 }
 
-// SubmitMultiResultBuffered is a helper function to submit a [types.MultiResultTask] to a [types.Pool] and runs the
+// SubmitStreamingBuffered is a helper function to submit a [types.StreamingTask] to a [types.WorkerPool] and runs the
 // callback for each result as it is produced.
 // The same advisories as for [Submit] about context cancellation apply.
 //
 // # Callback
 //
 // If the callback produces an error, the task will be canceled and the error will be returned.
-// If the special error [safeconcurrencyerrors.Stop] is be returned from the callback the task context will be canceled,
-// the results channel drained, and the callback will not be called again.
+// If the special error [safeconcurrencyerrors.Stop] is be returned from the callback the task [context.Context] will be
+// canceled, the results channel drained, and the callback will not be called again.
 //
 // # Error Handling
-// As both the callback and the task may return an error, the errors will be joined and returned, therefore always
-// make sure to use [errors.Is] and [errors.As] to check for errors returned from this function.
 //
-// # Buffering
+// If both the [types.StreamingTask] and the [types.ResultCallback] produce an error, the error from the
+// [types.ResultCallback] will be returned preferentially.
+// If the [types.ResultCallback] returns the special error [safeconcurrencyerrors.Stop], no error will be returned.
+// If the [types.Task] produces an error, it will be returned only if the [types.ResultCallback] does not produce an
+// error.
+//
+// # Results Buffering
 //
 // The buffer size of the results channel is specified by the buffer parameter.
 // It is recommended to avoid using a buffer size of 0, as this will block the worker until the result is received.
-//
-// # Other
-//
-// If you need more control, use [task.WrapMultiResultTaskBuffered] and publish to the [types.Pool.Requests] channel
-// directly.
-func SubmitMultiResultBuffered[ResourceT any, ValueT any](
+func SubmitStreamingBuffered[ResourceT any, ValueT any](
 	ctx context.Context,
-	pool types.Pool[ResourceT],
-	tsk types.MultiResultTask[ResourceT, ValueT],
+	pool types.WorkerPool[ResourceT],
+	tsk types.StreamingTask[ResourceT, ValueT],
 	buffer uint,
-	callback types.TaskCallback[ValueT],
+	callback types.ResultCallback[ValueT],
 ) error {
 	// select is not deterministic, and may still send tasks even if the context has been canceled.
 	if err := context.Cause(ctx); err != nil {
@@ -112,10 +111,10 @@ func SubmitMultiResultBuffered[ResourceT any, ValueT any](
 	defer cancel(context.Canceled)
 
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := task.WrapMultiResultTaskBuffered[ResourceT](ctx, tsk, buffer)
+	valuelessTask, taskResults := task.WrapStreaming[ResourceT](ctx, tsk, buffer)
 
 	// Submit the task to the pool.
-	// If context is canceled before the task is published it should return an error.
+	// If context is canceled before the task is sent it should return an error.
 	select {
 	case <-ctx.Done():
 		//nolint:wrapcheck
@@ -123,67 +122,55 @@ func SubmitMultiResultBuffered[ResourceT any, ValueT any](
 	case pool.Requests() <- valuelessTask:
 	}
 
-	// Only drain the results channel if the task was submitted successfully.
-	// We should always have already drained the results channel below, but this is a
-	// precaution to avoid deadlocks in the case a panic occurs and recovered by the caller.
-	defer func() {
-		// We already have a deference to cancel, however this should be done before the task results are drained.
-		// Remember that defered statements are executed in last-defered first-executed order (like a stack).
-		cancel(context.Canceled)
-		// We do not care about the error returned by Drain, if the error has not been returned it is because we are
-		// already panicking.
-		_ = taskResults.Drain()
-	}()
-
 	// Call the callback for each result as it is produced.
 	callbackErr := callbackTaskResults(ctx, taskResults.Results(), callback)
 	if callbackErr != nil {
 		// The callback an error, which means we should cancel the task and stop processing results.
 		cancel(fmt.Errorf("callback error %w", callbackErr))
-	}
-	taskErr := taskResults.Drain()
 
-	// The special error(s) safeconcurrencyerrors.Stop ought not to be returned.
-	if errors.Is(callbackErr, safeconcurrencyerrors.Stop) {
-		callbackErr = nil
-	}
-	if errors.Is(taskErr, safeconcurrencyerrors.Stop) {
-		taskErr = nil
+		// The special error safeconcurrencyerrors.Stop ought not to be returned.
+		if errors.Is(callbackErr, safeconcurrencyerrors.Stop) {
+			callbackErr = nil
+		}
+
+		return callbackErr
 	}
 
-	return errors.Join(callbackErr, taskErr)
+	// Non-blocking as the callback did not produce an error, it ran until the end of the results channel.
+	//nolint:wrapcheck
+	return taskResults.Drain()
 }
 
-// SubmitMultiResult is a helper function to submit a [types.MultiResultTask] to a [types.Pool] and runs the
-// callback for each result as it is produced.
-// It is equivalent to calling [SubmitMultiResultBuffered] with a buffer size of 1.
-// If you would like results buffering, use [SubmitMultiResultBuffered] instead.
-// See [SubmitMultiResultBuffered] for more details.
-func SubmitMultiResult[ResourceT any, ValueT any](
+// SubmitStreaming is a helper function to submit a [types.StreamingTask] to a [types.WorkerPool] and runs the callback
+// for each result as it is produced.
+// It is equivalent to calling [SubmitStreamingBuffered] with a buffer size of 1.
+// If you would like results buffering, use [SubmitStreamingBuffered] instead.
+// See [SubmitStreamingBuffered] for more details.
+func SubmitStreaming[ResourceT any, ValueT any](
 	ctx context.Context,
-	pool types.Pool[ResourceT],
-	task types.MultiResultTask[ResourceT, ValueT],
-	callback types.TaskCallback[ValueT],
+	pool types.WorkerPool[ResourceT],
+	task types.StreamingTask[ResourceT, ValueT],
+	callback types.ResultCallback[ValueT],
 ) error {
-	return SubmitMultiResultBuffered(ctx, pool, task, 1, callback)
+	return SubmitStreamingBuffered(ctx, pool, task, 1, callback)
 }
 
-// SubmitMultiResultCollectAll is a helper function to submit a [types.MultiResultTask] to a [types.Pool] and collects
+// SubmitStreamingCollectAll is a helper function to submit a [types.StreamingTask] to a [types.WorkerPool] and collects
 // all results to a slice.
 // It uses a buffer size of 1 for the results channel to minimize blocking the worker while reading the results.
 // The results slice is initialized with an expected capacity of 0, this may not be very efficient if the task produces
 // a lot of results.
 // If the task returns an error, the results slice returned will be nil.
-// SubmitMultiResultCollectAll useful for testing, debugging, and demonstration purposes where the performance
-// difference is unimportant and the ability to consume the results as they are produced is not required.
-// You should most likely use [SubmitMultiResult] instead.
-func SubmitMultiResultCollectAll[ResourceT any, ValueT any](
+// SubmitStreamingCollectAll useful for testing, debugging, and demonstration purposes where the performance difference
+// is unimportant and the ability to consume the results as they are produced is not required.
+// You should most likely use [SubmitStreaming] instead.
+func SubmitStreamingCollectAll[ResourceT any, ValueT any](
 	ctx context.Context,
-	pool types.Pool[ResourceT],
-	task types.MultiResultTask[ResourceT, ValueT],
+	pool types.WorkerPool[ResourceT],
+	task types.StreamingTask[ResourceT, ValueT],
 ) ([]ValueT, error) {
 	results := make([]ValueT, 0)
-	if err := SubmitMultiResult(ctx, pool, task, func(ctx context.Context, value ValueT) error {
+	if err := SubmitStreaming(ctx, pool, task, func(ctx context.Context, value ValueT) error {
 		results = append(results, value)
 
 		return nil
@@ -194,25 +181,26 @@ func SubmitMultiResultCollectAll[ResourceT any, ValueT any](
 	return results, nil
 }
 
-// SubmitFunc is a helper function to submit a [types.TaskFunc] to a [types.Pool].
+// SubmitFunc is a helper function to submit a [types.TaskFunc] to a [types.WorkerPool].
 // The same advisories as for [Submit] about context cancellation apply.
 //
 // # Error Handling
+//
 // The error returned from the task is returned to the caller.
 //
 // # Other
 //
-// If you need more control, use [task.WrapTaskFunc] and publish to the [types.Pool.Requests] channel directly.
+// If you need more control, use [task.WrapFunc] and send to the [types.WorkerPool.Requests] channel directly.
 func SubmitFunc[ResourceT any](
 	ctx context.Context,
-	pool types.Pool[ResourceT],
+	pool types.WorkerPool[ResourceT],
 	taskFunc types.TaskFunc[ResourceT],
 ) error {
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := task.WrapTaskFunc[ResourceT](ctx, taskFunc)
+	valuelessTask, taskResults := task.WrapFunc[ResourceT](ctx, taskFunc)
 
 	// Submit the task to the pool.
-	// If context is canceled before the task is published it should return an error.
+	// If context is canceled before the task is sent it should return an error.
 	select {
 	case <-ctx.Done():
 		//nolint:wrapcheck
@@ -238,7 +226,7 @@ func SubmitFunc[ResourceT any](
 
 // callbackTaskResults consumes the results channel and calls the callback for each result.
 func callbackTaskResults[ValueT any](
-	ctx context.Context, resultsChan <-chan ValueT, callback types.TaskCallback[ValueT],
+	ctx context.Context, resultsChan <-chan ValueT, callback types.ResultCallback[ValueT],
 ) error {
 	for {
 		select {

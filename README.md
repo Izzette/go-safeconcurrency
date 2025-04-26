@@ -18,7 +18,7 @@ Expect new features and improvements in future releases, generators and work poo
   - Adheres to Go best-practice: “[Do not communicate by sharing memory; instead, share memory by communicating](https://go.dev/blog/codelab-share)”
 - **Context Integration**: Built-in support for context cancellation and deadlines
 - **Error Handling**: Gracefully handle errors from concurrent operations
-- **Thread-Safe**: All APIs are designed for concurrent use with goroutines
+- **Concurrency-Safe**: All APIs are designed for concurrent use from different goroutines
   - Very few mutexes are used, instead synchronizing using channels and atomic operations
 - **Flexible Buffering**: Configurable request and result channel buffering for different throughput, synchronization,
   and back-pressure needs
@@ -35,21 +35,21 @@ Expect new features and improvements in future releases, generators and work poo
 
 ### Key Components
 
-1. **Generator**
-   Implement your concurrent logic by creating a type that satisfies `types.Runner`:
+1. **Generators**
+   Implement your concurrent logic by creating a type that satisfies `types.Producer`:
    ```go
-   type MyRunner struct{}
+   type MyProducer struct{}
 
-   func (r *MyRunner) Run(ctx context.Context, h types.Handle[Output]) error {
+   func (r *MyProducer) Run(ctx context.Context, h types.Emitter[Output]) error {
        // Your concurrent logic here
-       h.Publish(ctx, value)
+       h.Emit(ctx, value)
        return fatalErr
    }
    ```
 
    Create and manage concurrent execution:
    ```go
-   gen := generator.NewGenerator[Output](&MyRunner{})
+   gen := generator.New[Output](&MyProducer{})
    gen.Start(ctx)
    ```
 
@@ -73,12 +73,12 @@ Expect new features and improvements in future releases, generators and work poo
 
    Create and manage worker pools:
    ```go
-   mypool := workpool.NewPool[ResourceType](resource, concurrency)
+   mypool := workpool.New[ResourceType](resource, concurrency)
    mypool.Start()
    defer mypool.Close()
    ```
 
-   Submit tasks to the pool and receive results:
+   Submit tasks to the worker pool and receive results:
    ```go
    // Submit tasks
    val, err := workpool.Submit[ResourceType, Output](ctx, mypool, &task{})

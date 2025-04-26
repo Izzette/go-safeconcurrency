@@ -23,7 +23,7 @@ func (t *mockTask) Execute(ctx context.Context, res interface{}) (int, error) {
 
 func TestSubmitSuccess(t *testing.T) {
 	ctx := context.Background()
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
@@ -39,7 +39,7 @@ func TestSubmitSuccess(t *testing.T) {
 
 func TestSubmitTaskError(t *testing.T) {
 	ctx := context.Background()
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
@@ -55,7 +55,7 @@ func TestSubmitContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
@@ -89,7 +89,7 @@ func (t *mockTaskBlock) broadcastStarted() {
 
 func TestSubmitContextCancelledDuringWait(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
@@ -111,14 +111,14 @@ func TestSubmitContextCancelledDuringWait(t *testing.T) {
 	}
 }
 
-type mockMultiResultTask2 struct {
+type mockStreamingTask2 struct {
 	values []string
 	err    error
 }
 
-func (t *mockMultiResultTask2) Execute(ctx context.Context, _ interface{}, h types.Handle[string]) error {
+func (t *mockStreamingTask2) Execute(ctx context.Context, _ interface{}, h types.Emitter[string]) error {
 	for _, v := range t.values {
-		if err := h.Publish(ctx, v); err != nil {
+		if err := h.Emit(ctx, v); err != nil {
 			return err
 		}
 	}
@@ -126,15 +126,15 @@ func (t *mockMultiResultTask2) Execute(ctx context.Context, _ interface{}, h typ
 	return t.err
 }
 
-func TestSubmitMultiResultSuccess(t *testing.T) {
+func TestSubmitStreamingSuccess(t *testing.T) {
 	ctx := context.Background()
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
 	expected := []string{"a", "b", "c"}
-	task := &mockMultiResultTask2{values: expected}
-	results, err := SubmitMultiResultCollectAll[any, string](ctx, p, task)
+	task := &mockStreamingTask2{values: expected}
+	results, err := SubmitStreamingCollectAll[any, string](ctx, p, task)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -143,41 +143,41 @@ func TestSubmitMultiResultSuccess(t *testing.T) {
 	}
 }
 
-func TestSubmitMultiResultTaskError(t *testing.T) {
+func TestSubmitStreamingError(t *testing.T) {
 	ctx := context.Background()
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
 	expectedErr := errors.New("task error")
-	task := &mockMultiResultTask2{err: expectedErr}
-	_, err := SubmitMultiResultCollectAll[any, string](ctx, p, task)
+	task := &mockStreamingTask2{err: expectedErr}
+	_, err := SubmitStreamingCollectAll[any, string](ctx, p, task)
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("Expected error %v, got %v", expectedErr, err)
 	}
 }
 
-type mockMultiResultTask struct{ t *testing.T }
+type mockStreamingTask struct{ t *testing.T }
 
-func (t *mockMultiResultTask) Execute(ctx context.Context, res interface{}, h types.Handle[string]) error {
-	if err := h.Publish(ctx, "test"); err != nil {
-		t.t.Errorf("Failed to publish result: %v", err)
+func (t *mockStreamingTask) Execute(ctx context.Context, res interface{}, h types.Emitter[string]) error {
+	if err := h.Emit(ctx, "test"); err != nil {
+		t.t.Errorf("Failed to emit result: %v", err)
 	}
 
 	return nil
 }
 
-func TestSubmitMultiResultEarlyContextCanceled(t *testing.T) {
+func TestSubmitStreamingEarlyCtxCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	// Cancel immediately to simulate early cancellation.
 	cancel()
 
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
-	task := &mockMultiResultTask{t}
-	results, err := SubmitMultiResultCollectAll[any, string](ctx, p, task)
+	task := &mockStreamingTask{t}
+	results, err := SubmitStreamingCollectAll[any, string](ctx, p, task)
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected context.Canceled, got %v", err)
 	}
@@ -186,72 +186,72 @@ func TestSubmitMultiResultEarlyContextCanceled(t *testing.T) {
 	}
 }
 
-type mockMultiResultTaskBlocksOnContext struct {
-	t              *testing.T
-	values         []string
-	publishCond    *sync.Cond
-	publishedCount *atomic.Uint32
+type mockStreamingBlocksOnContext struct {
+	t         *testing.T
+	values    []string
+	emitCond  *sync.Cond
+	emitCount *atomic.Uint32
 }
 
-func (t *mockMultiResultTaskBlocksOnContext) Execute(ctx context.Context, _ interface{}, h types.Handle[string]) error {
+func (t *mockStreamingBlocksOnContext) Execute(ctx context.Context, _ interface{}, h types.Emitter[string]) error {
 	for _, v := range t.values {
-		if err := h.Publish(ctx, v); err != nil {
-			t.t.Fatalf("Failed to publish value: %v", err)
+		if err := h.Emit(ctx, v); err != nil {
+			t.t.Fatalf("Failed to emit value: %v", err)
 		}
-		t.publishedCount.Add(1)
+		t.emitCount.Add(1)
 	}
 
-	t.broadcastPublish()
+	t.broadcastEmit()
 	<-ctx.Done()
 
 	return context.Cause(ctx)
 }
 
-func (t *mockMultiResultTaskBlocksOnContext) broadcastPublish() {
-	t.publishCond.L.Lock()
-	defer t.publishCond.L.Unlock()
-	t.publishCond.Broadcast()
+func (t *mockStreamingBlocksOnContext) broadcastEmit() {
+	t.emitCond.L.Lock()
+	defer t.emitCond.L.Unlock()
+	t.emitCond.Broadcast()
 }
 
-func TestSubmitMultiResultContextCancelled(t *testing.T) {
+func TestSubmitStreamingCtxCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
-	publishCond := sync.NewCond(&sync.Mutex{})
-	task := &mockMultiResultTaskBlocksOnContext{
-		t:              t,
-		values:         []string{"a"},
-		publishCond:    publishCond,
-		publishedCount: &atomic.Uint32{},
+	emitCond := sync.NewCond(&sync.Mutex{})
+	task := &mockStreamingBlocksOnContext{
+		t:         t,
+		values:    []string{"a"},
+		emitCond:  emitCond,
+		emitCount: &atomic.Uint32{},
 	}
 
-	publishCond.L.Lock()
+	emitCond.L.Lock()
 	go func() {
-		defer publishCond.L.Unlock()
-		publishCond.Wait()
+		defer emitCond.L.Unlock()
+		emitCond.Wait()
 		cancel()
 	}()
 
-	_, err := SubmitMultiResultCollectAll[any, string](ctx, p, task)
+	_, err := SubmitStreamingCollectAll[any, string](ctx, p, task)
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected context.Canceled, got %v", err)
 	}
-	if v := task.publishedCount.Load(); v != 1 {
-		t.Errorf("Expected %d values to be published, got %d", len(task.values), v)
+	if v := task.emitCount.Load(); v != 1 {
+		t.Errorf("Expected %d values to be emitted, got %d", len(task.values), v)
 	}
 }
 
-func TestSubmitMultiResultStop(t *testing.T) {
+func TestSubmitStreamingStop(t *testing.T) {
 	ctx := context.Background()
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
-	task := &mockMultiResultTask2{values: []string{"a", "b", "c"}}
+	task := &mockStreamingTask2{values: []string{"a", "b", "c"}}
 	values := make([]string, 0)
-	err := SubmitMultiResultBuffered[any, string](ctx, p, task, 0, func(ctx context.Context, value string) error {
+	err := SubmitStreamingBuffered[any, string](ctx, p, task, 0, func(ctx context.Context, value string) error {
 		values = append(values, value)
 		if value == "b" {
 			return safeconcurrencyerrors.Stop
@@ -268,17 +268,17 @@ func TestSubmitMultiResultStop(t *testing.T) {
 	}
 }
 
-func TestSubmitMultiResultBothErrors(t *testing.T) {
+func TestSubmitStreamingBothErrors(t *testing.T) {
 	ctx := context.Background()
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
 	taskErr := errors.New("task error")
 	callbackErr := errors.New("callback error")
-	task := &mockMultiResultTask2{values: []string{"a", "b", "c"}, err: taskErr}
+	task := &mockStreamingTask2{values: []string{"a", "b", "c"}, err: taskErr}
 	values := make([]string, 0)
-	err := SubmitMultiResult[any, string](ctx, p, task, func(ctx context.Context, value string) error {
+	err := SubmitStreaming[any, string](ctx, p, task, func(ctx context.Context, value string) error {
 		values = append(values, value)
 		// Ensure the callback error is only after all the values are processed.
 		if value == "c" {
@@ -290,9 +290,12 @@ func TestSubmitMultiResultBothErrors(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected non-nil error")
 	}
-	// Check if the error is a join error and contains both task and callback errors.
-	if !errors.Is(err, taskErr) || !errors.Is(err, callbackErr) {
-		t.Errorf("Expected task error %v and callback error %v, got %v", taskErr, callbackErr, err)
+	// Check if the error is the callback error, not the task error.
+	if !errors.Is(err, callbackErr) {
+		t.Errorf("Expected callback error %v, got %v", callbackErr, err)
+	}
+	if errors.Is(err, taskErr) {
+		t.Errorf("Did not expected task error %v, but it was returned as part of %v", taskErr, err)
 	}
 
 	// Make sure that returning any error will not continue to process results.
@@ -302,15 +305,15 @@ func TestSubmitMultiResultBothErrors(t *testing.T) {
 	}
 }
 
-func TestSubmitMultiResultContextCancel(t *testing.T) {
+func TestSubmitStreamingCtxCancel2(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 
-	task := &mockMultiResultTask2{values: []string{"a", "b", "c"}}
+	task := &mockStreamingTask2{values: []string{"a", "b", "c"}}
 	values := make([]string, 0)
-	err := SubmitMultiResultBuffered[any, string](ctx, p, task, 0, func(ctx context.Context, value string) error {
+	err := SubmitStreamingBuffered[any, string](ctx, p, task, 0, func(ctx context.Context, value string) error {
 		values = append(values, value)
 		if value == "b" {
 			// Cancel the context to simulate a cancelation in-flight.
@@ -335,7 +338,7 @@ func TestSubmitMultiResultContextCancel(t *testing.T) {
 
 func TestSubmitFunc(t *testing.T) {
 	ctx := context.Background()
-	p := NewPool[any](nil, 1)
+	p := New[any](nil, 1)
 	p.Start()
 	defer p.Close()
 

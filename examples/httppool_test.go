@@ -6,13 +6,13 @@ import (
 	"sync"
 )
 
-// Demonstrates how [types.Pool] can be used to create a worker pool that executes HTTP requests concurrently using a
-// shared [*http.Client].
+// Demonstrates how [types.WorkerPool] can be used to create a worker pool that executes HTTP requests concurrently
+// using a shared [*http.Client].
 // See [HttpPool] for more details on how to implement a custom pool wrapper for easily running like-tasks.
 func Example_hTTPPool() {
 	// Create a new HTTP pool with a concurrency of 5.
 	httpPool := NewHttpPool(5)
-	// Close the types.Pool.
+	// Close the types.WorkerPool.
 	// It's important to close the pool only after all tasks have been submitted.
 	// This will also wait for the pool to finish processing all tasks.
 	defer httpPool.Close()
@@ -34,8 +34,8 @@ func Example_hTTPPool() {
 	}
 
 	// We'll request each URL in a separate goroutine and use a WaitGroup to wait for all of them to finish.
-	// In the real world, instead of launching a goroutine for each URL, you'd be submitting tasks on the pool from
-	// an handler for an HTTP request, for example.
+	// In the real world, instead of launching a goroutine for each URL, you'd be submitting tasks on the pool from a
+	// handler for an HTTP request, for example.
 	var wg sync.WaitGroup
 	for _, url := range urls {
 		wg.Add(1)

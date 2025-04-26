@@ -18,11 +18,11 @@ func (t *mockStreamingTask) Execute(ctx context.Context, res interface{}, h type
 	return nil
 }
 
-func TestWrapStreamingTask(t *testing.T) {
+func TestWrapStreaming(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bareTask, taskResult := WrapStreamingTask[interface{}, string](ctx, &mockStreamingTask{t}, 1)
+	bareTask, taskResult := WrapStreaming[interface{}, string](ctx, &mockStreamingTask{t}, 1)
 
 	// Execute task synchronously
 	bareTask.Execute(nil)
@@ -50,11 +50,11 @@ func (t *mockTask) Execute(ctx context.Context, res interface{}) (int, error) {
 	return t.val, t.err
 }
 
-func TestWrapTask(t *testing.T) {
+func TestWrap(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bareTask, taskResult := WrapTask[interface{}, int](ctx, &mockTask{val: 42})
+	bareTask, taskResult := Wrap[interface{}, int](ctx, &mockTask{val: 42})
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -76,11 +76,11 @@ func TestWrapTask(t *testing.T) {
 	wg.Wait()
 }
 
-func TestWrapTaskFunc(t *testing.T) {
+func TestWrapFunc(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bareTask, taskResult := WrapTaskFunc[interface{}](ctx, func(ctx context.Context, res interface{}) error {
+	bareTask, taskResult := WrapFunc[interface{}](ctx, func(ctx context.Context, res interface{}) error {
 		return nil
 	})
 

@@ -27,7 +27,7 @@ import (
 //
 // # Other
 //
-// If you need more control, use [task.WrapTaskBuffered] and send to the [types.WorkerPool.Requests] channel directly.
+// If you need more control, use [task.WrapBuffered] and send to the [types.WorkerPool.Requests] channel directly.
 func Submit[ResourceT any, ValueT any](
 	ctx context.Context,
 	pool types.WorkerPool[ResourceT],
@@ -42,7 +42,7 @@ func Submit[ResourceT any, ValueT any](
 	}
 
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := task.WrapTask[ResourceT, ValueT](ctx, tsk)
+	valuelessTask, taskResults := task.Wrap[ResourceT, ValueT](ctx, tsk)
 
 	// Submit the task to the pool.
 	// If context is canceled before the task is sent it should return an error.
@@ -111,7 +111,7 @@ func SubmitStreamingBuffered[ResourceT any, ValueT any](
 	defer cancel(context.Canceled)
 
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := task.WrapStreamingTask[ResourceT](ctx, tsk, buffer)
+	valuelessTask, taskResults := task.WrapStreaming[ResourceT](ctx, tsk, buffer)
 
 	// Submit the task to the pool.
 	// If context is canceled before the task is sent it should return an error.
@@ -185,18 +185,19 @@ func SubmitStreamingCollectAll[ResourceT any, ValueT any](
 // The same advisories as for [Submit] about context cancellation apply.
 //
 // # Error Handling
+//
 // The error returned from the task is returned to the caller.
 //
 // # Other
 //
-// If you need more control, use [task.WrapTaskFunc] and send to the [types.WorkerPool.Requests] channel directly.
+// If you need more control, use [task.WrapFunc] and send to the [types.WorkerPool.Requests] channel directly.
 func SubmitFunc[ResourceT any](
 	ctx context.Context,
 	pool types.WorkerPool[ResourceT],
 	taskFunc types.TaskFunc[ResourceT],
 ) error {
 	// Wrap the task in a ValuelessTask to be able to submit it to the pool.
-	valuelessTask, taskResults := task.WrapTaskFunc[ResourceT](ctx, taskFunc)
+	valuelessTask, taskResults := task.WrapFunc[ResourceT](ctx, taskFunc)
 
 	// Submit the task to the pool.
 	// If context is canceled before the task is sent it should return an error.

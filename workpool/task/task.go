@@ -7,7 +7,7 @@ import (
 	"github.com/Izzette/go-safeconcurrency/results"
 )
 
-// WrapTask wraps a [types.Task] so that it can be executed in a [types.WorkerPool] and returns a channel for
+// Wrap wraps a [types.Task] so that it can be executed in a [types.WorkerPool] and returns a channel for
 // results.
 // This channel has a buffer size of 1 and will not block the worker when publishing the result.
 // The results channel is always written to, even if the task returns an error.
@@ -17,7 +17,7 @@ import (
 // The [workpool.Submit] helper will wrap the [types.Task], submit it to the pool, and wait for the result.
 // The [workpool.Submit] helper implements error handling correctly and is less error prone than using this wrapper and
 // sending to the [types.WorkerPool.Requests] channel directly.
-func WrapTask[ResourceT any, ValueT any](
+func Wrap[ResourceT any, ValueT any](
 	ctx context.Context,
 	task types.Task[ResourceT, ValueT],
 ) (types.ValuelessTask[ResourceT], types.TaskResult[ValueT]) {
@@ -38,7 +38,7 @@ func WrapTask[ResourceT any, ValueT any](
 	return wrappedTask, taskResult
 }
 
-// WrapStreamingTask wraps a [types.StreamingTask] so that it can be executed in a [types.WorkerPool] and returns
+// WrapStreaming wraps a [types.StreamingTask] so that it can be executed in a [types.WorkerPool] and returns
 // a channel for results.
 // The buffer size of the results channel is specified by the buffer parameter.
 // It is recommended avoid using a buffer size of 0, as this will block the worker until the result is received.
@@ -49,7 +49,7 @@ func WrapTask[ResourceT any, ValueT any](
 // result as it is produced.
 // This helper implements error handling correctly and is less error prone than using this wrapper and sending to the
 // [types.WorkerPool.Requests] channel directly.
-func WrapStreamingTask[ResourceT any, ValueT any](
+func WrapStreaming[ResourceT any, ValueT any](
 	ctx context.Context,
 	task types.StreamingTask[ResourceT, ValueT],
 	buffer uint,
@@ -71,17 +71,17 @@ func WrapStreamingTask[ResourceT any, ValueT any](
 	return wrappedTask, taskResult
 }
 
-// WrapTaskFunc wraps a [types.TaskFunc] so that it can be executed in a [types.WorkerPool] and returns a
+// WrapFunc wraps a [types.TaskFunc] so that it can be executed in a [types.WorkerPool] and returns a
 // [types.TaskResult] for execution monitoring and error propagation.
 // It is not recommended to use this wrapper directly, but rather use the
 // [github.com/Izzette/go-safeconcurrency/workpool.SubmitFunc] helper function.
 // This [workpool.SubmitFunc] helper will wrap the [types.TaskFunc], submit it to the pool, and wait for the result.
 // The [workpool.SubmitFunc] helper implements error handling correctly and is less error prone than using this wrapper
 // and sending to the [types.WorkerPool.Requests] channel directly.
-func WrapTaskFunc[ResourceT any](ctx context.Context, f types.TaskFunc[ResourceT]) (
+func WrapFunc[ResourceT any](ctx context.Context, f types.TaskFunc[ResourceT]) (
 	types.ValuelessTask[ResourceT], types.TaskResult[struct{}],
 ) {
-	return WrapTask[ResourceT, struct{}](ctx, taskFuncWrapper[ResourceT]{f})
+	return Wrap[ResourceT, struct{}](ctx, taskFuncWrapper[ResourceT]{f})
 }
 
 // taskResult implements [types.TaskResult].

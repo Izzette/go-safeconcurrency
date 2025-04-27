@@ -82,11 +82,10 @@ func Submit[ResourceT any, ValueT any](
 //
 // # Error Handling
 //
-// If both the [types.StreamingTask] and the [types.ResultCallback] produce an error, the error from the
-// [types.ResultCallback] will be returned preferentially.
-// If the [types.ResultCallback] returns the special error [safeconcurrencyerrors.Stop], no error will be returned.
-// If the [types.Task] produces an error, it will be returned only if the [types.ResultCallback] does not produce an
-// error.
+// If both the [types.StreamingTask] and the [ResultCallback] produce an error, the error from the [ResultCallback] will
+// be returned preferentially.
+// If the [ResultCallback] returns the special error [safeconcurrencyerrors.Stop], no error will be returned.
+// If the [types.Task] produces an error, it will be returned only if the [ResultCallback] does not produce an error.
 //
 // # Results Buffering
 //
@@ -97,7 +96,7 @@ func SubmitStreamingBuffered[ResourceT any, ValueT any](
 	pool types.WorkerPool[ResourceT],
 	tsk types.StreamingTask[ResourceT, ValueT],
 	buffer uint,
-	callback types.ResultCallback[ValueT],
+	callback ResultCallback[ValueT],
 ) error {
 	// select is not deterministic, and may still send tasks even if the context has been canceled.
 	if err := context.Cause(ctx); err != nil {
@@ -150,10 +149,18 @@ func SubmitStreaming[ResourceT any, ValueT any](
 	ctx context.Context,
 	pool types.WorkerPool[ResourceT],
 	task types.StreamingTask[ResourceT, ValueT],
-	callback types.ResultCallback[ValueT],
+	callback ResultCallback[ValueT],
 ) error {
 	return SubmitStreamingBuffered(ctx, pool, task, 1, callback)
 }
+
+// ResultCallback is a callback used by [SubmitStreaming] to process the results of a [types.StreamingTask] as they are
+// produced.
+// If the callback returns any error, the task context will be canceled and the callback will not be called with new
+// results.
+// If the error is the special [safeconcurrencyerrors.Stop] error, the task will be stopped as normal, however the error
+// will not be returned to the caller (simulating break).
+type ResultCallback[ValueT any] func(context.Context, ValueT) error
 
 // SubmitStreamingCollectAll is a helper function to submit a [types.StreamingTask] to a [types.WorkerPool] and collects
 // all results to a slice.
@@ -226,7 +233,7 @@ func SubmitFunc[ResourceT any](
 
 // callbackTaskResults consumes the results channel and calls the callback for each result.
 func callbackTaskResults[ValueT any](
-	ctx context.Context, resultsChan <-chan ValueT, callback types.ResultCallback[ValueT],
+	ctx context.Context, resultsChan <-chan ValueT, callback ResultCallback[ValueT],
 ) error {
 	for {
 		select {

@@ -20,15 +20,16 @@ jobs:
           check-latest: true
 
       - name: Build
-        run: go build -v ./...
+        run: make buildable
 
-      - name: Test
-        run: go test -v -race -cover ./...
+      - name: Test Unit
+        run: make test-unit
+
+      - name: Run testable examples
+        run: make test-examples
 
       - name: Benchmark
-        run: go test -v -run '^Benchmark' -bench . ./...
+        run: make benchmark
 
       - name: Test flakiness
-        # Run the unit tests with a high count to check for flakiness
-        # Yes, we really can run the tests 100000 times in just a few seconds
-        run: go test -count 100000 -failfast -skip '^Example' ./...
+        run: make test-flakiness

@@ -102,21 +102,43 @@ Full API documentation is available on [GoDoc](https://pkg.go.dev/github.com/Izz
 
 We welcome contributions! Please follow these guidelines:
 
-1. Set up development environment:
-   ```bash
-   go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+1. Install pre-requisites:
+   - Go 1.20 or later
+   - Python 3.9 or later (for pre-commit)
+   - pre-commit (https://pre-commit.com/)
+   - Make (GNU Make recommended: https://www.gnu.org/software/make/)
+   - Golangci-lint (https://golangci-lint.run/welcome/install/#local-installation):
+     - ```shell
+       go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+       ```
+
+2. Set up development environment:
+   ```shell
+   # Install python virtual environment for pre-commit hooks
    pre-commit install
    ```
 
-2. Ensure all tests pass:
+3. Ensure all tests pass:
    ```bash
-   pre-commit run --all-files
-   go test -v -race ./...
+   # Run all tests and linters
+   make all
    ```
 
-3. Add tests for new features
-4. Update documentation accordingly
-5. Open a pull request with a clear description
+4. Add tests for new features, make sure to check the test coverage:
+   ```bash
+   # Run tests with coverage
+   make test-unit
+   ```
+   Use `go tool cover -html tmp/coverage/cover.out` to view the coverage report in your browser.
+
+5. Update documentation accordingly.
+   Use Godoc comments for public types and functions: https://go.dev/blog/godoc
+
+6. Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit titles.
+   This is required for our automated release process, [Release Please](https://github.com/googleapis/release-please).
+
+7. Open a pull request with a clear description of the changes and why they are needed.
+   Include the CHANGELOG entry you would like to see in the release, it doesn't need to be perfect: we can refine it together.
 
 ## License
 

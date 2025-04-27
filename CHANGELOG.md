@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.4.0](https://github.com/Izzette/go-safeconcurrency/compare/v0.3.2...v0.4.0) (2025-04-27)
+
+
+### Features
+
+* **eventloop:** Add event loops ([777aa4d](https://github.com/Izzette/go-safeconcurrency/commit/777aa4d0af24544c063d6035c46efbcf86cdb02e))
+  * Interface type `types.EventLoop`, `types.Event`, and
+    `types.StateSnapshot`
+  * Type alias `types.GenerationID`
+  * Factory functions for `types.EventLoop`: `eventloop.New`,
+    `eventloop.NewBuffered`
+  * Helpers `eventloop.WaitForGeneration` and `eventloop.SendAndWait`
+  * Helper to watch to eventloop state snapshots `eventloop.WatchState`
+    and `eventloop.WatchStateFunc`
+  * Basic example in `examples/eventloop_test.go` and
+    `examples/ecommerce.go`
+  * Advanced example with fake e-commerce server in
+    `examples/ecommerceeventloop_test.go` and the `examples/ecommerce`
+    module
+  * Updated documentation
+* Remove redundant "task" from workpool/task ([467bccc](https://github.com/Izzette/go-safeconcurrency/commit/467bccc5a5a0867cb5c172595022aafe417d13ac))
+  * Rename `task.WrapTask` → `task.Wrap`
+  * Rename `task.WrapStreamingTask` → `task.WrapStreaming`
+  * Rename `task.WrapTaskFunc` → `task.WrapFunc`
+* correct typo in GoDoc comment for workpool/util.go ([b666099](https://github.com/Izzette/go-safeconcurrency/commit/b666099d9a9ef103f645499f54de39183fd606fe))
+* move `types.ResultCallback` to the `workpool` package ([bbc5f24](https://github.com/Izzette/go-safeconcurrency/commit/bbc5f242c6600020068de554bfa185e38cf9181c))
+* remove context from types.ValuelessTask ([29d9dc3](https://github.com/Izzette/go-safeconcurrency/commit/29d9dc32ce642ff0d739c74a98df0fdf157fd5eb))
+* rename `generator.NewGenerator*` → `generator.New*` ([4845164](https://github.com/Izzette/go-safeconcurrency/commit/48451649a670be4acf7b120867fe416ff76f6c0b))
+* Rename many APIs ([d40498e](https://github.com/Izzette/go-safeconcurrency/commit/d40498ea96cb8abdc43383c265a3f7969441c830))
+  * `types.Runner` → `types.Producer`
+  * `types.Handle` → `types.Emitter`
+    * `.Publish` → `.Emit`
+  * `types.Pool` → `types.WorkerPool`
+  * `types.MultiResultTask` → `types.StreamingTask`
+    * `workpool.SubmitMultiResult*` → `workpool.SubmitStreaming*`:
+      These functions no longer return joined errors, and prefer returning
+      the callback error.
+    * `task.WrapMultiResultTaskBuffered` → `task.WrapStreamingTask`
+    * Removed `task.WrapMultiResultTask`
+  * `types.TaskCallback` → `types.ResultCallback`
+  * `workpool.NewPool*` → `workpool.New*`
+
 ## [0.3.2](https://github.com/Izzette/go-safeconcurrency/compare/v0.3.1...v0.3.2) (2025-04-22)
 
 

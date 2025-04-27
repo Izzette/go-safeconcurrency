@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.4.0](https://github.com/Izzette/go-safeconcurrency/compare/v0.3.2...v0.4.0) (2025-04-27)
+
+
+### Features
+
+* **eventloop:** Add event loops ([2fc807b](https://github.com/Izzette/go-safeconcurrency/commit/2fc807b4f9b4738b62f72a43783616cc7bbe5917))
+* **eventloop:** Add event loops ([777aa4d](https://github.com/Izzette/go-safeconcurrency/commit/777aa4d0af24544c063d6035c46efbcf86cdb02e))
+* Remove redundant "task" from workpool/task ([467bccc](https://github.com/Izzette/go-safeconcurrency/commit/467bccc5a5a0867cb5c172595022aafe417d13ac))
+
+
+### Bug Fixes
+
+* correct typo in GoDoc comment for workpool/util.go ([b666099](https://github.com/Izzette/go-safeconcurrency/commit/b666099d9a9ef103f645499f54de39183fd606fe))
+* move `types.ResultCallback` to the `workpool` package ([f1af868](https://github.com/Izzette/go-safeconcurrency/commit/f1af868cdc4c1ea7bc84768f54d29c9bea7d9a29))
+* move `types.ResultCallback` to the `workpool` package ([bbc5f24](https://github.com/Izzette/go-safeconcurrency/commit/bbc5f242c6600020068de554bfa185e38cf9181c))
+* remove context from types.ValuelessTask ([bfa679a](https://github.com/Izzette/go-safeconcurrency/commit/bfa679ab546b76f8c3206589b0e09243c12192f7))
+* remove context from types.ValuelessTask ([29d9dc3](https://github.com/Izzette/go-safeconcurrency/commit/29d9dc32ce642ff0d739c74a98df0fdf157fd5eb))
+* rename `generator.NewGenerator*` → `generator.New*` ([4845164](https://github.com/Izzette/go-safeconcurrency/commit/48451649a670be4acf7b120867fe416ff76f6c0b))
+* Rename many APIs ([e83f01d](https://github.com/Izzette/go-safeconcurrency/commit/e83f01d58fc6a574184915bc0bb206ba6566fa59))
+* Rename many APIs ([d40498e](https://github.com/Izzette/go-safeconcurrency/commit/d40498ea96cb8abdc43383c265a3f7969441c830))
+
 ## [0.3.2](https://github.com/Izzette/go-safeconcurrency/compare/v0.3.1...v0.3.2) (2025-04-22)
 
 

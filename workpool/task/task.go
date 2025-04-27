@@ -13,10 +13,11 @@ import (
 // The results channel is always written to, even if the task returns an error.
 // The provided context is passed to the task when it is executed in the [types.WorkerPool].
 //
-// It is recommended not to use this wrapper directly, but rather use the [workpool.Submit] helper function.
-// The [workpool.Submit] helper will wrap the [types.Task], submit it to the pool, and wait for the result.
-// The [workpool.Submit] helper implements error handling correctly and is less error prone than using this wrapper and
-// sending to the [types.WorkerPool.Requests] channel directly.
+// It is recommended not to use this wrapper directly, but rather use the
+// [github.com/Izzette/go-safeconcurrency/workpool.Submit] helper function.
+// This helper will wrap the [types.Task], submit it to the pool, and wait for the result.
+// This helper implements error handling correctly and is less error prone than using this wrapper and sending to the
+// [types.WorkerPool.Requests] channel directly.
 func Wrap[ResourceT any, ValueT any](
 	ctx context.Context,
 	task types.Task[ResourceT, ValueT],
@@ -75,9 +76,9 @@ func WrapStreaming[ResourceT any, ValueT any](
 // [types.TaskResult] for execution monitoring and error propagation.
 // It is not recommended to use this wrapper directly, but rather use the
 // [github.com/Izzette/go-safeconcurrency/workpool.SubmitFunc] helper function.
-// This [workpool.SubmitFunc] helper will wrap the [types.TaskFunc], submit it to the pool, and wait for the result.
-// The [workpool.SubmitFunc] helper implements error handling correctly and is less error prone than using this wrapper
-// and sending to the [types.WorkerPool.Requests] channel directly.
+// This helper will wrap the [types.TaskFunc], submit it to the pool, and wait for the result.
+// The helper implements error handling correctly and is less error prone than using this wrapper and sending to the
+// [types.WorkerPool.Requests] channel directly.
 func WrapFunc[ResourceT any](ctx context.Context, f types.TaskFunc[ResourceT]) (
 	types.ValuelessTask[ResourceT], types.TaskResult[struct{}],
 ) {

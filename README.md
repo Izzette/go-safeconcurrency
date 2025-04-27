@@ -24,12 +24,14 @@ Expect new features and improvements in future releases, generators and work poo
   and back-pressure needs
 - **Worker Pools**: Operate in a pool of workers to manage shared resources across heterogeneous tasks called from
   different goroutines (perfect for API clients or database connections)
+- **Event Loops**: Support for event loops for handling events in a sequential manner
+   - Atomic state snapshots with generation tracking
+   - Event hooks for monitoring and customization
 
 ### Planned Features
 
 - **Parallel Mapping**: Support for parallel mapping of input values to output results
 - **Pipeline Support**: Create pipelines of generators for complex workflows
-- **Event Loops**: Support for event loops for handling asynchronous events
 
 ## Usage
 
@@ -85,6 +87,46 @@ Expect new features and improvements in future releases, generators and work poo
    // Handle result
    ```
 
+3. **Event Loops**
+   Implement your event logic by creating a type that satisfies `types.Event`:
+   ```go
+   type RequestEvent struct {}
+
+   func (e *RequestEvent) Dispatch(gen types.GenerationID, s *AppState) {
+       fmt.Printf("Processing request #%d\n", gen)
+       s.Requests++
+   }
+   ```
+
+   Create a state type to hold your application state:
+   ```go
+   type AppState struct { Requests int }
+   ```
+
+   Create and manage the event loop:
+   ```go
+   el := eventloop.New[AppState](&AppState{})
+   defer el.Close()
+   el.Start()
+   ```
+
+   Send events to the loop:
+   ```go
+   gen, err := el.Send(ctx, &RequestEvent{})
+   if err != nil {
+       panic(err)
+   }
+   ```
+
+   Wait for the event to be processed and get a snapshot of the state:
+   ```go
+   snap, err := eventloop.WaitFor(ctx, el, gen)
+   if err != nil {
+       panic(err)
+   }
+   fmt.Printf("Current requests: %d\n", snap.State().Requests)
+   ```
+
 See the [examples](examples) directory for more detailed examples, or interact
 with them in the browser on
 [pkg.go.dev](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/examples).
@@ -96,6 +138,7 @@ Full API documentation is available on [GoDoc](https://pkg.go.dev/github.com/Izz
 - For types and interfaces, see [api/types](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/api/types).
 - For creating generators, see [generator](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/generator).
 - For creating worker pools and tasks, see [workpool](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/workpool).
+- For creating event loops, see [eventloop](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/eventloop).
 - Examples can be interacted with in the browser at [examples](https://pkg.go.dev/github.com/Izzette/go-safeconcurrency/examples).
 
 ## Contributing

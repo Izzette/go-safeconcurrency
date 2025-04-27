@@ -97,6 +97,37 @@ Run with:
 go test -v -run Example_sharedPool
 ```
 
+#### Event Loop with State Snapshots
+
+**Files**: `eventloop_test.go`
+
+Demonstrates using the event loop to maintain consistent state snapshots.
+
+_Here's an abridged version of the example_:
+```go
+el := eventloop.New[AppState](ctx, &AppState{})
+defer el.Close()
+el.Start()
+
+snap, err := SendAndWait[AppState](ctx, el, &RequestEvent{})
+if err != nil {
+    panic(err)
+}
+fmt.Printf("Current requests: %d\n", snap.State().Requests)
+```
+
+Run with:
+```bash
+go test -v -run Example_eventLoop
+```
+#### Advanced Event Loop with Complex State Management
+
+**Files**: `ecommerceeventloop_test.go`
+
+Demonstrates a more complex event loop managing an e-commerce application state.
+This example shows how to handle multiple event types and maintain a consistent state.
+Some of the implementation has been moved to the [`ecommerce`](./ecommerce) package.
+
 ### Running Examples and Expected Outputs
 
 If you're not familiar with Go's runnable examples, they are a way to include

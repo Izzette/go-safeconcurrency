@@ -74,11 +74,3 @@ type TaskResult[ValueT any] interface {
 	// to Drain returns.
 	Drain() error
 }
-
-// ResultCallback is a callback used by [github.com/Izzette/go-safeconcurrency/workpool.SubmitStreaming] to process the
-// results of a [types.StreamingTask] as they are produced.
-// If the callback returns any error, the task context will be canceled and the callback will not be called with new
-// results.
-// If the error is the special [github.com/Izzette/go-safeconcurrency/api/safeconcurrencyerrors.Stop] error, the task
-// will be stopped as normal, however the error will not be returned to the caller (simulating break).
-type ResultCallback[ValueT any] func(context.Context, ValueT) error

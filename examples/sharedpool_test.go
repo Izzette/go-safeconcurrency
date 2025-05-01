@@ -1,9 +1,10 @@
-package examples
+package examples_test
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/Izzette/go-safeconcurrency/examples"
 	"github.com/Izzette/go-safeconcurrency/workpool"
 )
 
@@ -13,6 +14,9 @@ import (
 // The pool is created with no shared resource, no buffering, and a concurrency of 1 using [workpool.NewBuffered].
 // Tasks are submitted with [workpool.Submit] and [workpool.SubmitStreaming].
 func Example_sharedPool() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Create a new pool with no shared resource, no buffering, and a concurrency of 1.
 	sharedpool := workpool.NewBuffered[any](nil, 1, 0)
 	// Close the types.WorkerPool.
@@ -24,7 +28,7 @@ func Example_sharedPool() {
 	sharedpool.Start()
 
 	// Submit a task that returns an int and handle the result.
-	value, err := workpool.Submit[any, int](context.Background(), sharedpool, &IntTask{42})
+	value, err := workpool.Submit[any, int](context.Background(), sharedpool, &examples.IntTask{42})
 	if err != nil {
 		fmt.Printf("Error from IntTask: %v\n", err)
 	} else {
@@ -32,13 +36,13 @@ func Example_sharedPool() {
 	}
 
 	// This task doesn't return any result or error.
-	workpool.Submit[any, any](context.Background(), sharedpool, &LogTask{"A message sent from the pool by LogTask"})
+	workpool.Submit[any, any](ctx, sharedpool, &examples.LogTask{"A message sent from the pool by LogTask"})
 
 	// Tasks can also stream multiple results.
 	// StringTask implements types.StreamingTask, submit it to the pool using workpool.SubmitStreaming, passing a callback
 	// that will be invoked for each result.
 	err = workpool.SubmitStreaming[any, string](
-		context.Background(), sharedpool, &StringTask{[]string{"hello", "world"}},
+		context.Background(), sharedpool, &examples.StringTask{[]string{"hello", "world"}},
 		func(_ctx context.Context, value string) error {
 			// This function is called for each result emitted by the task.
 			// It is _not_ called in the goroutine of the task, pool resources should not be used here.
@@ -53,7 +57,7 @@ func Example_sharedPool() {
 	// This task won't run because the context is already canceled.
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	cancelFunc()
-	_, err = workpool.SubmitStreamingCollectAll[any, string](ctx, sharedpool, &StringTask{})
+	_, err = workpool.SubmitStreamingCollectAll[any, string](ctx, sharedpool, &examples.StringTask{})
 	if err != nil {
 		fmt.Printf("Error submitting StringTask: %v\n", err)
 	}

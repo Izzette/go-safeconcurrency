@@ -1,17 +1,24 @@
-package examples
+package examples_test
 
 import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/Izzette/go-safeconcurrency/examples"
 )
 
 // Demonstrates how [types.WorkerPool] can be used to create a worker pool that executes HTTP requests concurrently
 // using a shared [*http.Client].
 // See [HttpPool] for more details on how to implement a custom pool wrapper for easily running like-tasks.
 func Example_hTTPPool() {
+	if examples.IsPkgsite() {
+		// We cannot run this test in the pkg.go.dev environment as it doesn't have access to the internet.
+		panic("Skipping test in pkg.go.dev environment.")
+	}
+
 	// Create a new HTTP pool with a concurrency of 5.
-	httpPool := NewHttpPool(5)
+	httpPool := examples.NewHttpPool(5)
 	// Close the types.WorkerPool.
 	// It's important to close the pool only after all tasks have been submitted.
 	// This will also wait for the pool to finish processing all tasks.

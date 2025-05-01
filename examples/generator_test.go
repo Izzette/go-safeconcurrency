@@ -1,10 +1,11 @@
-package examples
+package examples_test
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"github.com/Izzette/go-safeconcurrency/examples"
 	"github.com/Izzette/go-safeconcurrency/generator"
 )
 
@@ -14,7 +15,7 @@ import (
 func Example_generator() {
 	// Create a new generator with a buffer size of 1.
 	// The IteratorJob generates integers from 0 to 9.
-	w := generator.NewBuffered[int](&IteratorJob{EndExclusive: 10}, 1)
+	w := generator.NewBuffered[int](&examples.IteratorJob{EndExclusive: 10}, 1)
 
 	// Start the generator with a context that has a deadline of 2 seconds.
 	ctx, _ := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))

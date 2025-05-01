@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0](https://github.com/Izzette/go-safeconcurrency/compare/v0.4.0...v0.5.0) (2025-05-01)
+
+
+### Features
+
+* **eventloop:** improve snapshot interface for eventloop ([eb7bfd2](https://github.com/Izzette/go-safeconcurrency/commit/eb7bfd2d72bdae51b9a74a051e744d77f9a85332))
+  * Four implementaitons for snapshot: Value (non-reference), Slice, Map, Copyable interface.
+  * Move snapshot.go to it's own package.
+
 ## [0.4.0](https://github.com/Izzette/go-safeconcurrency/compare/v0.3.2...v0.4.0) (2025-04-27)
 
 

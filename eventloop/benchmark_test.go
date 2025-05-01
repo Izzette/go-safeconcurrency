@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Izzette/go-safeconcurrency/api/types"
+	"github.com/Izzette/go-safeconcurrency/eventloop/snapshot"
 )
 
 // BenchmarkEventLoopThroughput measures the throughput of the [types.EventLoop].
@@ -15,7 +16,7 @@ func BenchmarkEventLoopThroughput(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	el := NewBuffered[int](new(int), 16)
+	el := NewBuffered[int](snapshot.NewZeroValue[int](), 16)
 	defer el.Close()
 	defer cancel()
 	el.Start()
@@ -39,8 +40,8 @@ func BenchmarkEventLoopThroughput(b *testing.B) {
 	// Stop timer to avoid including the teardown time in the benchmark
 	b.StopTimer()
 
-	if *snap.State() != b.N {
-		b.Errorf("expected state %d, got %d", b.N, *snap.State())
+	if snap.State() != b.N {
+		b.Errorf("expected state %d, got %d", b.N, snap.State())
 	}
 }
 
@@ -48,6 +49,8 @@ func BenchmarkEventLoopThroughput(b *testing.B) {
 type benchEvent struct{}
 
 // Dispatch implements [types.Event.Dispatch].
-func (e *benchEvent) Dispatch(_ types.GenerationID, s *int) {
-	*s++
+func (e *benchEvent) Dispatch(_ types.GenerationID, s int) int {
+	s++
+
+	return s
 }

@@ -20,8 +20,9 @@ type AddToCartEvent struct {
 }
 
 // Dispatch implements [types.Event.Dispatch].
-func (e *AddToCartEvent) Dispatch(_ types.GenerationID, s *state.UserState) {
+func (e *AddToCartEvent) Dispatch(_ types.GenerationID, s *state.UserState) *state.UserState {
 	s.UpdateCart(e.ProductID, e.Quantity)
+	return s
 }
 
 // RemoveFromCartEvent removes items from cart

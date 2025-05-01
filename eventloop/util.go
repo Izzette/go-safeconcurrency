@@ -67,17 +67,45 @@ func SendAndWait[StateT any](
 	return snap, nil
 }
 
-// copyPtr creates a shallow copy of value at the pointer p and returns a pointer to the copy.
-func copyPtr[T any](ptr *T) *T {
-	// If the pointer is nil, return nil.
-	if ptr == nil {
-		return nil
-	}
+// EventFromFunc creates a new event from a function that takes a [types.GenerationID] and a state and returns the next
+// state.
+func EventFromFunc[StateT any](fn types.EventFunc[StateT]) types.Event[StateT] {
+	return &eventFunc[StateT]{fn: fn}
+}
 
-	// Allocate a new pointer to the type T and copy the value from the original pointer.
-	cpy := new(T)
-	*cpy = *ptr
+// SendFunc is a convenience function that sends a function to the [types.EventLoop].
+// It is equivalent to calling [EventFromFunc] and then [types.EventLoop.Send].
+func SendFunc[StateT any](
+	ctx context.Context,
+	eventLoop types.EventLoop[StateT],
+	fn func(types.GenerationID, StateT) StateT,
+) (types.GenerationID, error) {
+	event := EventFromFunc(fn)
 
-	// Return the copy.
-	return cpy
+	//nolint:wrapcheck
+	return eventLoop.Send(ctx, event)
+}
+
+// SendFuncAndWait is a convenience function that sends a function to the [types.EventLoop] and waits for it to be
+// processed.
+// It is equivalent to calling [EventFromFunc], [types.EventLoop.Send], and then [WaitForGeneration] with the returned
+// generation ID.
+func SendFuncAndWait[StateT any](
+	ctx context.Context,
+	eventLoop types.EventLoop[StateT],
+	fn func(types.GenerationID, StateT) StateT,
+) (types.StateSnapshot[StateT], error) {
+	event := EventFromFunc(fn)
+
+	return SendAndWait(ctx, eventLoop, event)
+}
+
+// eventFunc is an implementation of [types.Event] that wraps a function.
+type eventFunc[StateT any] struct {
+	fn func(types.GenerationID, StateT) StateT
+}
+
+// Dispatch implements [types.Event.Dispatch].
+func (e *eventFunc[StateT]) Dispatch(gen types.GenerationID, state StateT) StateT {
+	return e.fn(gen, state)
 }

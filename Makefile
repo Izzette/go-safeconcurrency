@@ -19,7 +19,7 @@ buildable: ## Check if the project is buildable
 .PHONY: test-unit
 test-unit: ## Run the unit tests
 	mkdir -p tmp/coverage
-	go test -v -timeout 10s -race -coverprofile=tmp/coverage/cover.out \
+	go test -v -timeout 10s -race -skip '^Example' -coverprofile=tmp/coverage/cover.out \
 		./...
 
 .PHONY: test-examples

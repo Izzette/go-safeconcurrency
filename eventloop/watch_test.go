@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Izzette/go-safeconcurrency/api/types"
+	"github.com/Izzette/go-safeconcurrency/eventloop/snapshot"
 )
 
 func TestWatchState(t *testing.T) {
@@ -13,7 +14,7 @@ func TestWatchState(t *testing.T) {
 	defer cancel()
 
 	// Create a new event loop.
-	el := New[testState](&testState{})
+	el := New[*testState](snapshot.NewCopyable(&testState{}))
 	defer el.Close()
 
 	// Start the event loop.
@@ -21,7 +22,7 @@ func TestWatchState(t *testing.T) {
 
 	closeStartedOnce := &sync.Once{}
 	started := make(chan struct{})
-	done := WatchState(ctx, el, func(ctx context.Context, snap types.StateSnapshot[testState]) bool {
+	done := WatchState(ctx, el, func(ctx context.Context, snap types.StateSnapshot[*testState]) bool {
 		// Notify that the watcher has started.
 		closeStartedOnce.Do(func() {
 			close(started)
@@ -62,13 +63,13 @@ func TestWatchStateCancel(t *testing.T) {
 	defer cancel()
 
 	// Create a new event loop.
-	el := New[testState](&testState{})
+	el := New[*testState](snapshot.NewCopyable(&testState{}))
 	defer el.Close()
 
 	// Start the event loop.
 	el.Start()
 
-	done := WatchState(ctx, el, func(ctx context.Context, snap types.StateSnapshot[testState]) bool {
+	done := WatchState(ctx, el, func(ctx context.Context, snap types.StateSnapshot[*testState]) bool {
 		if snap.Generation() > 0 {
 			// Break on the second snapshot.
 			return false
@@ -90,13 +91,13 @@ func TestWatchStateEventLoopClosed(t *testing.T) {
 	defer cancel()
 
 	// Create a new event loop.
-	el := New[testState](&testState{})
+	el := New[*testState](snapshot.NewCopyable(&testState{}))
 	defer el.Close()
 
 	// Start the event loop.
 	el.Start()
 
-	done := WatchState(ctx, el, func(ctx context.Context, snap types.StateSnapshot[testState]) bool {
+	done := WatchState(ctx, el, func(ctx context.Context, snap types.StateSnapshot[*testState]) bool {
 		if snap.Generation() > 0 {
 			// Break on the second snapshot.
 			return false

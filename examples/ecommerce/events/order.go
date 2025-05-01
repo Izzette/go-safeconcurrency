@@ -17,11 +17,11 @@ type CheckoutEvent struct {
 }
 
 // Dispatch implements [types.Event.Dispatch].
-func (e *CheckoutEvent) Dispatch(_ types.GenerationID, s *state.UserState) {
+func (e *CheckoutEvent) Dispatch(_ types.GenerationID, s *state.UserState) *state.UserState {
 	cart := s.GetCart()
 	if len(cart) == 0 {
 		e.Err = ErrCartEmpty
-		return
+		return s
 	}
 
 	order := &state.Order{
@@ -35,6 +35,8 @@ func (e *CheckoutEvent) Dispatch(_ types.GenerationID, s *state.UserState) {
 	e.OrderID = order.ID
 	s.UpdateOrder(e.OrderID, order)
 	s.ClearCart()
+
+	return s
 }
 
 // UpdateOrderStatusEvent changes order status
@@ -47,12 +49,13 @@ type UpdateOrderStatusEvent struct {
 }
 
 // Dispatch implements [types.Event.Dispatch].
-func (e *UpdateOrderStatusEvent) Dispatch(_ types.GenerationID, s *state.UserState) {
+func (e *UpdateOrderStatusEvent) Dispatch(_ types.GenerationID, s *state.UserState) *state.UserState {
 	order := s.GetOrder(e.OrderID)
 	if order == nil {
 		fmt.Printf("ERROR: order %s not found\n", e.OrderID)
-		return
+		return s
 	}
 	order.Status = e.Status
 	s.UpdateOrder(e.OrderID, order)
+	return s
 }

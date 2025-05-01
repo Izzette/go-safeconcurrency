@@ -7,26 +7,39 @@ import (
 
 	"github.com/Izzette/go-safeconcurrency/api/safeconcurrencyerrors"
 	"github.com/Izzette/go-safeconcurrency/api/types"
+	"github.com/Izzette/go-safeconcurrency/eventloop/snapshot"
 )
 
 type testEvent struct {
-	fn func(gen types.GenerationID, s *testState)
+	fn func(gen types.GenerationID, s *testState) *testState
+}
+
+// Dispatch implements [types.Event] for testEvent.
+func (e *testEvent) Dispatch(gen types.GenerationID, s *testState) *testState {
+	if e.fn == nil {
+		return s
+	}
+
+	return e.fn(gen, s)
 }
 
 type testState struct {
 	counter int
 }
 
-func (e *testEvent) Dispatch(gen types.GenerationID, s *testState) {
-	if e.fn == nil {
-		return
+// Copy implements [types.Copyable] for testState.
+func (s *testState) Copy() *testState {
+	if s == nil {
+		return nil
 	}
 
-	e.fn(gen, s)
+	return &testState{
+		counter: s.counter,
+	}
 }
 
 func TestNewEventLoop(t *testing.T) {
-	el := New[any](nil)
+	el := New[int](snapshot.NewZeroValue[int]())
 	defer el.Close()
 
 	if el == nil {
@@ -38,16 +51,18 @@ func TestEventLoopBasicOperation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	initialState := &testState{counter: 0}
-	el := NewBuffered[testState](initialState, 10)
+	initialSnapshot := snapshot.NewCopyable(&testState{counter: 0})
+	el := NewBuffered[*testState](initialSnapshot, 10)
 	defer el.Close()
 	el.Start()
 
 	// Send increment events
 	for i := 0; i < 5; i++ {
 		if gen, err := el.Send(ctx, &testEvent{
-			fn: func(_ types.GenerationID, s *testState) {
+			fn: func(_ types.GenerationID, s *testState) *testState {
 				s.counter++
+
+				return s
 			},
 		}); err != nil {
 			t.Fatalf("failed to send event: %v", err)
@@ -72,8 +87,8 @@ func TestEventLoopSnapshotGeneration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	initialState := &testState{counter: 0}
-	el := NewBuffered[testState](initialState, 0)
+	initialSnapshot := snapshot.NewCopyable(&testState{counter: 0})
+	el := NewBuffered[*testState](initialSnapshot, 0)
 	defer el.Close()
 	el.Start()
 
@@ -85,11 +100,13 @@ func TestEventLoopSnapshotGeneration(t *testing.T) {
 
 	// Send first event
 	if gen, err := el.Send(
-		ctx, &testEvent{fn: func(gen types.GenerationID, s *testState) {
+		ctx, &testEvent{fn: func(gen types.GenerationID, s *testState) *testState {
 			if gen != 1 {
 				t.Errorf("expected generation 1, got %d", gen)
 			}
 			s.counter++
+
+			return s
 		}},
 	); err != nil {
 		t.Fatalf("failed to send event: %v", err)
@@ -109,8 +126,8 @@ func TestEventLoopContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	initialState := &testState{counter: 0}
-	el := NewBuffered[testState](initialState, 0)
+	initialSnapshot := snapshot.NewCopyable(&testState{counter: 0})
+	el := NewBuffered[*testState](initialSnapshot, 0)
 	defer el.Close()
 	el.Start()
 
@@ -127,8 +144,8 @@ func TestWaitForCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	initialState := &testState{counter: 0}
-	el := New[testState](initialState)
+	initialSnapshot := snapshot.NewCopyable(&testState{counter: 0})
+	el := New[*testState](initialSnapshot)
 	defer el.Close()
 	el.Start()
 
@@ -148,8 +165,8 @@ func TestWaitForLoopClosed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	initialState := &testState{counter: 0}
-	el := NewBuffered[testState](initialState, 0)
+	initialSnapshot := snapshot.NewCopyable(&testState{counter: 0})
+	el := NewBuffered[*testState](initialSnapshot, 0)
 	defer el.Close()
 	el.Start()
 
@@ -169,18 +186,20 @@ func TestSendAndWait(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	initialState := &testState{counter: 0}
-	el := NewBuffered[testState](initialState, 0)
+	initialSnapshot := snapshot.NewCopyable(&testState{counter: 0})
+	el := NewBuffered[*testState](initialSnapshot, 0)
 	defer el.Close()
 	el.Start()
 
 	// Send an event and wait for it
-	snap, err := SendAndWait[testState](ctx, el, &testEvent{
-		fn: func(gen types.GenerationID, s *testState) {
+	snap, err := SendAndWait[*testState](ctx, el, &testEvent{
+		fn: func(gen types.GenerationID, s *testState) *testState {
 			if gen != 1 {
 				t.Errorf("expected generation 1, got %d", gen)
 			}
 			s.counter++
+
+			return s
 		},
 	})
 	if err != nil {
@@ -198,8 +217,8 @@ func TestEventLoopClosed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	initialState := &testState{}
-	el := NewBuffered[testState](initialState, 1)
+	initialSnapshot := snapshot.NewCopyable(&testState{})
+	el := NewBuffered[*testState](initialSnapshot, 1)
 	defer el.Close()
 	el.Start()
 
@@ -222,14 +241,14 @@ func TestSendAndWaitSendCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	initialState := &testState{}
-	el := New[testState](initialState)
+	initialSnapshot := snapshot.NewCopyable(&testState{})
+	el := New[*testState](initialSnapshot)
 	defer el.Close()
 	el.Start()
 
 	// Cancel the context before sending
 	cancel()
-	_, err := SendAndWait[testState](ctx, el, &testEvent{})
+	_, err := SendAndWait[*testState](ctx, el, &testEvent{})
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled error, got %v", err)
 	}
@@ -244,8 +263,8 @@ func TestSendAndWaitWaitCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	initialState := &testState{}
-	el := New[testState](initialState)
+	initialSnapshot := snapshot.NewCopyable(&testState{})
+	el := New[*testState](initialSnapshot)
 	defer el.Close()
 	el.Start()
 
@@ -253,9 +272,11 @@ func TestSendAndWaitWaitCancel(t *testing.T) {
 	waitCtx, waitCancel := context.WithCancel(context.Background())
 	defer waitCancel()
 
-	_, err := SendAndWait[testState](ctx, el, &testEvent{fn: func(gen types.GenerationID, s *testState) {
+	_, err := SendAndWait[*testState](ctx, el, &testEvent{fn: func(gen types.GenerationID, s *testState) *testState {
 		cancel()
 		<-waitCtx.Done()
+
+		return s
 	}})
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled error, got %v", err)

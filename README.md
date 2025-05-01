@@ -65,9 +65,9 @@ Expect new features and improvements in future releases, generators and work poo
 2. **Worker Pools**
    Implement your task logic by creating a type that satisfies `types.Task`:
    ```go
-   type task struct{}
+   type Task struct{}
 
-   func (t *task) Execute(ctx context.Context, resource ResourceType) (Output, error) {
+   func (t *Task) Execute(ctx context.Context, resource ResourceType) (Output, error) {
        // Your task logic here
        return result, nil
    }
@@ -83,7 +83,7 @@ Expect new features and improvements in future releases, generators and work poo
    Submit tasks to the worker pool and receive results:
    ```go
    // Submit tasks
-   val, err := workpool.Submit[ResourceType, Output](ctx, mypool, &task{})
+   val, err := workpool.Submit[ResourceType, Output](ctx, mypool, &Task{})
    // Handle result
    ```
 
@@ -92,20 +92,26 @@ Expect new features and improvements in future releases, generators and work poo
    ```go
    type RequestEvent struct {}
 
-   func (e *RequestEvent) Dispatch(gen types.GenerationID, s *AppState) {
+   func (e *RequestEvent) Dispatch(gen types.GenerationID, s *AppState) *AppState {
        fmt.Printf("Processing request #%d\n", gen)
        s.Requests++
+       return s
    }
    ```
 
    Create a state type to hold your application state:
    ```go
    type AppState struct { Requests int }
+
+   func (s *AppState) Copy() *AppState {
+       return snapshot.CopyPtr(s)
+   }
    ```
 
    Create and manage the event loop:
    ```go
-   el := eventloop.New[AppState](&AppState{})
+   snap := snapshot.NewCopyable(&AppState{})
+   el := eventloop.New[*AppState](snap)
    defer el.Close()
    el.Start()
    ```
@@ -120,7 +126,7 @@ Expect new features and improvements in future releases, generators and work poo
 
    Wait for the event to be processed and get a snapshot of the state:
    ```go
-   snap, err := eventloop.WaitFor(ctx, el, gen)
+   snap, err = eventloop.WaitForGeneration(ctx, el, gen)
    if err != nil {
        panic(err)
    }

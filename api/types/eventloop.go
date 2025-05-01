@@ -38,8 +38,6 @@ type EventLoop[StateT any] interface {
 	Send(context.Context, Event[StateT]) (GenerationID, error)
 
 	// Snapshot returns a StateSnapshot with a copy of the current state of the event loop.
-	// Do not modify the state pointer returned by this method, as it will be shared with all other snapshots of the same
-	// GenerationID.
 	Snapshot() StateSnapshot[StateT]
 }
 
@@ -48,23 +46,28 @@ type Event[StateT any] interface {
 	// Dispatch is called when the event is processed in the loop.
 	//
 	//  - GenerationID: the ID of the state snapshot that will be available after the event is processed.
-	//  - *StateT: a pointer to a shallow copy of the state.  Updates to the state will be persisted after the event is
-	//    processed.
+	//  - StateT: a copy of the state.  The event should return the state after modification.  Another copy of this state
+	//    will be performed when creating the next snapshot.
 	//
 	// The event loop will be blocked until the event is processed.
-	// If the state passed to the dispatch method is modified after the event is processed, the changes will not be
-	// persisted (for example, if the event dispatches a goroutine).
-	Dispatch(GenerationID, *StateT)
+	Dispatch(GenerationID, StateT) StateT
 }
 
 // StateSnapshot is an interface that represents a snapshot of the state at a given point in time.
 // It is returned by the [types.EventLoop.Snapshot] method.
 // Snapshots are used to provide a consistent view of the state from outside the event loop.
+//
+// You can create initial state snapshots by calling
+// [github.com/Izzette/go-safeconcurrency/eventloop/snapshot.NewValue],
+// [github.com/Izzette/go-safeconcurrency/eventloop/snapshot.NewMap],
+// [github.com/Izzette/go-safeconcurrency/eventloop/snapshot.NewSlice],
+// or [github.com/Izzette/go-safeconcurrency/eventloop/snapshot.NewCopyable].
 type StateSnapshot[StateT any] interface {
-	// This returns the state at the time of the snapshot.
-	// Do not modify the state pointer returned by this method, as it will be shared with all other snapshots of the same
-	// GenerationID.
-	State() *StateT
+	// This returns a copy of the state at the time of the snapshot.
+	State() StateT
+
+	// Next creates a new snapshot with the state passed to it and an incremented generation ID.
+	Next(StateT) StateSnapshot[StateT]
 
 	// Generation returns the monotonically increasing generation ID of the state snapshot.
 	// This ID is incremented each time an event is processed in the event loop.
@@ -77,4 +80,14 @@ type StateSnapshot[StateT any] interface {
 	// EventLoop.Done() and StateSnapshot.Expiration() channels.
 	// The helper function eventloop.WaitForGeneration and eventloop.SendAndWait will do this for you.
 	Expiration() <-chan struct{}
+
+	// Expire will mark this snapshot as expired, closing the .Expiration() channel.
+	// This is called automatically when the event loop updates the latest state snapshot.
+	// You are not expected to call this method directly.
+	Expire()
 }
+
+// EventFunc is a function matching the dispatch signature of an event.
+// With [github.com/Izzette/go-safeconcurrency/eventloop.EventFromFunc] you can create an event from a function
+// matching this signature.
+type EventFunc[StateT any] func(GenerationID, StateT) StateT

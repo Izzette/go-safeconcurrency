@@ -41,6 +41,7 @@ linters:
           - prealloc
           - err113
           - wrapcheck
+          - goconst
         path: (.+)_test.go
     paths:
       - ^(.*/)?third_party(/.*)?$

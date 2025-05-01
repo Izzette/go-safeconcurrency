@@ -24,43 +24,21 @@ type ReserveStockEvent struct {
 }
 
 // Dispatch implements [types.Event.Dispatch].
-func (e *ReserveStockEvent) Dispatch(_ types.GenerationID, s *state.ProductStockState) {
-	product := s.GetProduct(e.ProductID)
+func (e *ReserveStockEvent) Dispatch(_ types.GenerationID, s map[string]*state.Product) map[string]*state.Product {
+	product := s[e.ProductID].Copy()
 	if product == nil {
 		e.Err = ErrProductNotFound
-		return
+		return s
 	}
 
 	availableStock := product.Available()
 	if availableStock < e.Quantity {
 		e.Err = fmt.Errorf("insufficient stock for %s", e.ProductID)
-		return
+		return s
 	}
 	product.Reserved += e.Quantity
 
 	// Only persist the product changes if the stock is available
-	s.UpdateProduct(e.ProductID, product)
-}
-
-// ReleaseStockEvent returns inventory to available stock
-type ReleaseStockEvent struct {
-	ProductID string
-	Quantity  int
-}
-
-// Dispatch implements [types.Event.Dispatch].
-func (e *ReleaseStockEvent) Execute(_ types.GenerationID, s *state.ProductStockState) {
-	product := s.GetProduct(e.ProductID)
-	if product == nil {
-		fmt.Printf("ERROR: %v\n", ErrProductNotFound)
-		return
-	}
-
-	if product.Reserved < e.Quantity {
-		panic("cannot release more stock than reserved")
-	}
-	product.Reserved -= e.Quantity
-
-	// Save back to the state in a Copy-on-Write fashion
-	s.UpdateProduct(e.ProductID, product)
+	s[e.ProductID] = product
+	return s
 }

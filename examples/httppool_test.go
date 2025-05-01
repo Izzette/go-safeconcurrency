@@ -21,10 +21,10 @@ func Example_hTTPPool() {
 	httpPool.Start()
 
 	urls := []string{
-		"https://httpbin.org/delay/1",    // Will take 1 second to respond
-		"https://httpbin.org/status/500", // Will return a 500 error
-		"httpxs:///mal_formatted_url",    // Should produce an error as the URL is malformed
-		"http://300.300.300.300",         // Should produce an error as the IP is invalid
+		"https://httpstat.us/200?sleep=1000", // Will take 1 second to respond
+		"https://httpstat.us/500",            // Will return a 500 error
+		"httpxs:///mal_formatted_url",        // Should produce an error as the URL is malformed
+		"http://300.300.300.300",             // Should produce an error as the IP is invalid
 
 		// The following URLs are valid and should return a 200 OK response
 		"https://www.google.com",
@@ -62,6 +62,6 @@ func Example_hTTPPool() {
 	// [https://www.google.com] HTTP/2.0 200 OK
 	// [https://go.dev] HTTP/2.0 200 OK
 	// [https://stackoverflow.com] HTTP/2.0 200 OK
-	// [https://httpbin.org/status/500] HTTP/2.0 500 Internal Server Error
-	// [https://httpbin.org/delay/1] HTTP/2.0 200 OK
+	// [https://httpstat.us/500] HTTP/1.1 500 Internal Server Error
+	// [https://httpstat.us/200?sleep=1000] HTTP/1.1 200 OK
 }

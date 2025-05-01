@@ -105,15 +105,14 @@ Demonstrates using the event loop to maintain consistent state snapshots.
 
 _Here's an abridged version of the example_:
 ```go
-el := eventloop.New[AppState](ctx, &AppState{})
-defer el.Close()
+el := eventloop.New(snapshot.NewValue(0))
 el.Start()
 
-snap, err := SendAndWait[AppState](ctx, el, &RequestEvent{})
-if err != nil {
-    panic(err)
-}
-fmt.Printf("Current requests: %d\n", snap.State().Requests)
+snap, err := eventloop.SendFuncAndWait(ctx, el, func(_ types.GenerationID, state int) int {
+    return state + 1
+})
+
+fmt.Printf("Counter: %d\n", snap.State())
 ```
 
 Run with:

@@ -3,6 +3,9 @@ package state
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/Izzette/go-safeconcurrency/api/types"
+	"github.com/Izzette/go-safeconcurrency/eventloop/snapshot"
 )
 
 // UserState tracks individual user carts and orders
@@ -16,14 +19,16 @@ type UserState struct {
 	orderSequence int // used to generate unique order IDs
 }
 
-func NewUserState() *UserState {
-	return &UserState{
+// NewUserSnapshot creates a [types.StateSnapshot] with an empty user state.
+func NewUserSnapshot() types.StateSnapshot[*UserState] {
+	return snapshot.NewCopyable(&UserState{
 		cart:          make(map[string]int),
 		orders:        make(map[string]*Order),
 		orderSequence: 1, // Start order IDs from 1
-	}
+	})
 }
 
+// NextOrderID generates a new unique order ID.
 func (s *UserState) NextOrderID() string {
 	orderID := strconv.Itoa(s.orderSequence)
 	s.orderSequence++
@@ -36,21 +41,14 @@ func (s *UserState) NextOrderID() string {
 // It returns an empty map if the cart is empty.
 func (s *UserState) GetCart() map[string]int {
 	// Return a copy of the cart to avoid modifying the original
-	cartCopy := make(map[string]int)
-	for k, v := range s.cart {
-		cartCopy[k] = v
-	}
-	return cartCopy
+	return snapshot.CopyMap(s.cart)
 }
 
 // UpdateCart updates the user's cart with the given product ID and quantity.
 // UpdateCart uses a Copy-on-Write strategy to avoid modifying the original cart.
 func (s *UserState) UpdateCart(productID string, quantity int) {
 	// Copy the cart to avoid modifying the original
-	cart := make(map[string]int)
-	for k, v := range s.cart {
-		cart[k] = v
-	}
+	cart := snapshot.CopyMap(s.cart)
 
 	// Update the cart
 	if quantity == 0 {
@@ -75,29 +73,27 @@ func (s *UserState) ClearCart() {
 // In order to persist the changes, call [UserState.UpdateOrder] with the order ID and the modified order
 // It returns nil if the order is not found.
 func (s *UserState) GetOrder(orderID string) *Order {
-	order, exists := s.orders[orderID]
-	if !exists {
-		return nil
-	}
-	// Return a copy of the order to avoid modifying the original
-	orderCopy := *order
-	return &orderCopy
+	return s.orders[orderID].Copy()
 }
 
 // UpdateOrder updates an order in the user state.
 // It uses a Copy-on-Write strategy to avoid modifying the original order.
 func (s *UserState) UpdateOrder(orderID string, order *Order) {
 	// Copy the orders to avoid modifying the originals
-	orders := make(map[string]*Order)
-	for k, v := range s.orders {
-		orders[k] = v
-	}
+	orders := snapshot.CopyMap(s.orders)
 
 	// Update the order
-	orders[orderID] = order
+	orders[orderID] = order.Copy()
 
 	// Replace the orders map with the updated one
 	s.orders = orders
+}
+
+// Copy implements [types.Copyable.Copy].
+// A Copy-on-Write strategy is used for updates to avoid modifying the original state, so it's safe to use a shallow
+// copy.
+func (s *UserState) Copy() *UserState {
+	return snapshot.CopyPtr(s)
 }
 
 // Order represents a user's order
@@ -112,6 +108,12 @@ type Order struct {
 	Status string
 }
 
+// String implements the [fmt.Stringer] interface.
 func (o *Order) String() string {
 	return fmt.Sprintf("Order ID: %s, Status: %s, Items: %v", o.ID, o.Status, o.Items)
+}
+
+// Copy implements [types.Copyable.Copy].
+func (o *Order) Copy() *Order {
+	return snapshot.CopyPtr(o)
 }

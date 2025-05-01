@@ -23,17 +23,17 @@ import (
 //   - GET api/user/order?user_id&order_id → Order # Display order details
 //   - POST api/user/order/status?user_id&order_id {status: string} # Updating order status
 type EcommerceServer struct {
-	stockLoop types.EventLoop[state.ProductStockState]
-	userLoops *sync.Map // userID -> user EventLoop
+	stockLoop types.EventLoop[map[string]*state.Product] // event loop for managing product stock
+	userLoops *sync.Map                                  // userID -> user EventLoop
 	mux       *http.ServeMux
 }
 
 // NewEcommerceServer initializes the server with the initial stock.
 func NewEcommerceServer(initialStock map[string]*state.Product) *EcommerceServer {
-	stockState := state.NewProductStockState(initialStock)
+	stockSnapshot := state.NewProductStockSnapshot(initialStock)
 
 	server := &EcommerceServer{
-		stockLoop: eventloop.New[state.ProductStockState](stockState),
+		stockLoop: eventloop.New[map[string]*state.Product](stockSnapshot),
 		userLoops: &sync.Map{},
 		mux:       http.NewServeMux(),
 	}
@@ -48,8 +48,8 @@ func NewEcommerceServer(initialStock map[string]*state.Product) *EcommerceServer
 }
 
 // GetStockLoop returns the event loop for managing product stock
-func (s *EcommerceServer) GetUserLoop(userID string) types.EventLoop[state.UserState] {
-	newLoop := eventloop.New(state.NewUserState())
+func (s *EcommerceServer) GetUserLoop(userID string) types.EventLoop[*state.UserState] {
+	newLoop := eventloop.New(state.NewUserSnapshot())
 	loadedLoop, loaded := s.userLoops.LoadOrStore(userID, newLoop)
 	if loaded {
 		// Close the new loop if it was not stored in the map.
@@ -62,7 +62,7 @@ func (s *EcommerceServer) GetUserLoop(userID string) types.EventLoop[state.UserS
 
 	// Cast the loaded loop to the correct type.
 	// We are the only ones who store in the map and we only store types.EventLoop[state.UserState].
-	loop, ok := loadedLoop.(types.EventLoop[state.UserState])
+	loop, ok := loadedLoop.(types.EventLoop[*state.UserState])
 	if !ok {
 		panic("user loop is not of type EventLoop")
 	}
@@ -82,9 +82,9 @@ func (s *EcommerceServer) Start() {
 func (s *EcommerceServer) Stop() {
 	s.stockLoop.Close()
 	s.userLoops.Range(func(_, value interface{}) bool {
-		loop, ok := value.(types.EventLoop[state.UserState])
+		loop, ok := value.(types.EventLoop[*state.UserState])
 		if !ok {
-			panic("user loop is not of type EventLoop")
+			panic("user loop is not of types.EventLoop[*state.UserState]")
 		}
 
 		loop.Close()
@@ -113,7 +113,7 @@ func (s *EcommerceServer) HandleProduct(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	product := s.stockLoop.Snapshot().State().GetProduct(productID)
+	product := s.stockLoop.Snapshot().State()[productID].Copy()
 	if product == nil {
 		http.Error(w, "Product not found", http.StatusNotFound)
 		return

@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 
 	"github.com/Izzette/go-safeconcurrency/api/types"
+	"github.com/Izzette/go-safeconcurrency/internal/safeconcurrencysync"
 	"github.com/Izzette/go-safeconcurrency/workpool"
-	"github.com/Izzette/go-safeconcurrency/workpool/task"
 )
 
 // NewBuffered creates (but does not start) a basic implementation of [types.EventLoop].
@@ -55,16 +55,16 @@ import (
 func NewBuffered[StateT any](initialSnapshot types.StateSnapshot[StateT], buffer uint) types.EventLoop[StateT] {
 	snapshotPtr := &atomic.Pointer[types.StateSnapshot[StateT]]{}
 	snapshotPtr.Store(&initialSnapshot)
-	initialGeneration := initialSnapshot.Generation()
-	submissionPool := workpool.New[*types.GenerationID](&initialGeneration, 1)
 	eventPool := workpool.NewBuffered[*atomic.Pointer[types.StateSnapshot[StateT]]](snapshotPtr, 1, buffer)
 
 	return &eventLoop[StateT]{
 		done:      make(chan struct{}),
 		closeOnce: &sync.Once{},
 
-		submissionPool: submissionPool,
-		eventPool:      eventPool,
+		eventPool: eventPool,
+
+		generation:     initialSnapshot.Generation(),
+		generationLock: safeconcurrencysync.NewChannelLock(),
 
 		snapshotPtr: snapshotPtr,
 	}
@@ -82,11 +82,10 @@ type eventLoop[StateT any] struct {
 	done      chan struct{}
 	closeOnce *sync.Once
 
-	// expectedGenID submits the event to the eventPool and increments the expected generation ID.
-	// It is used to ensure that the event is processed in the order it was submitted.
-	// It must have no buffering to ensure that context deadlines of submitted tasks are respected.
-	submissionPool types.WorkerPool[*types.GenerationID]
-	eventPool      types.WorkerPool[*atomic.Pointer[types.StateSnapshot[StateT]]]
+	eventPool types.WorkerPool[*atomic.Pointer[types.StateSnapshot[StateT]]]
+
+	generation     types.GenerationID
+	generationLock *safeconcurrencysync.ChannelLock
 
 	snapshotPtr *atomic.Pointer[types.StateSnapshot[StateT]]
 }
@@ -94,13 +93,11 @@ type eventLoop[StateT any] struct {
 // Start implements [types.EventLoop.Start].
 func (l *eventLoop[StateT]) Start() {
 	l.eventPool.Start()
-	l.submissionPool.Start()
 }
 
 // Close implements [types.EventLoop.Close].
 func (l *eventLoop[StateT]) Close() {
 	// Close the pools and wait for all tasks to complete.
-	l.submissionPool.Close()
 	l.eventPool.Close()
 	l.closeOnce.Do(l.closeDone)
 }
@@ -122,53 +119,23 @@ func (l *eventLoop[StateT]) Send(ctx context.Context, event types.Event[StateT])
 	eventTask := &eventWrapper[StateT]{
 		event: event,
 	}
-	// The submitEventTask will be submitted to the l.expectedGenPool, which will provide the generation ID
-	// without explicit locking while respecting the context deadline.
-	submitTask := &submitEventTask[StateT]{
-		task: eventTask,
-		pool: l.eventPool,
-	}
 
-	// In order to provide the guarantee that either the event was sent or an error is returned, we need to ensure
-	// that the task is dispatched so long as it is submitted to the pool, and wait for the result.
-	// As the expectedGenPool has no buffering, we can be sure that the task is being executed and will return if the
-	// context is cancelled.
-	// As a result the workpool.Submit helpers are not suitable for this use case, and we must wrap the task manually.
-	wrappedSubmitTask, results := task.Wrap[*types.GenerationID, types.GenerationID](ctx, submitTask)
+	// Obtain the lock to ensure that the generation ID is incremented once for each event and that the order of events is
+	// aligned with the order of generation IDs.
+	if err := l.generationLock.LockWithContext(ctx); err != nil {
+		//nolint:wrapcheck
+		return 0, err
+	}
+	defer l.generationLock.Unlock()
+
 	select {
 	case <-ctx.Done():
 		//nolint:wrapcheck
 		return 0, context.Cause(ctx)
-	case l.submissionPool.Requests() <- wrappedSubmitTask:
-		// The task was successfully sent to the expectedGenPool.
-		expectedGen := <-results.Results()
-		err := results.Drain()
+	case l.eventPool.Requests() <- eventTask:
+		l.generation++ // increment the generation ID only if the event task is successfully submitted.
 
-		//nolint:wrapcheck
-		return expectedGen, err
-	}
-}
-
-type submitEventTask[StateT any] struct {
-	task types.ValuelessTask[*atomic.Pointer[types.StateSnapshot[StateT]]]
-	pool types.WorkerPool[*atomic.Pointer[types.StateSnapshot[StateT]]]
-}
-
-// Execute implements [types.Task.Execute].
-func (t *submitEventTask[StateT]) Execute(
-	ctx context.Context,
-	expectedGenPtr *types.GenerationID,
-) (types.GenerationID, error) {
-	select {
-	case <-ctx.Done():
-		//nolint:wrapcheck
-		return 0, context.Cause(ctx)
-	case t.pool.Requests() <- t.task:
-		// The task was successfully sent to the pool.
-		// Let's increment the expected generation ID.
-		*expectedGenPtr++
-
-		return *expectedGenPtr, nil
+		return l.generation, nil
 	}
 }
 

@@ -11,7 +11,6 @@ import (
 // BenchmarkEventLoopThroughput measures the throughput of the [types.EventLoop].
 // It sends a large number of simple [types.Event] instances, checking that the [types.StateSnapshot] is updated
 // correctly, and measures the time taken.
-// It's performance is heavily tied to the performance of [workpool.Submit].
 func BenchmarkEventLoopThroughput(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

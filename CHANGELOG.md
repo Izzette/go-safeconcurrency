@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/Izzette/go-safeconcurrency/compare/v0.5.0...v0.5.1) (2025-05-10)
+
+
+### Bug Fixes
+
+* **eventloop:** improve throughput of event loop ([605598e](https://github.com/Izzette/go-safeconcurrency/commit/605598e8ea08cb4cd4261ebea3a8d38cae13d026))
+* **eventloop:** improve throughput of event loop ([81d47dd](https://github.com/Izzette/go-safeconcurrency/commit/81d47ddc108374bc0ac2f66b27034fbee57abc26))
+
 ## [0.5.0](https://github.com/Izzette/go-safeconcurrency/compare/v0.4.0...v0.5.0) (2025-05-01)
 
 
